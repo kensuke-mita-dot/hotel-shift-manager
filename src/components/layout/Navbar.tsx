@@ -19,6 +19,7 @@ const ROLE_BADGE_CLASS: Record<UserRole, string> = {
 const ADMIN_LINKS = [
   { href: '/admin/daily',   label: '日次調整' },
   { href: '/admin/monthly', label: '月次一覧' },
+  { href: '/admin/staff',   label: 'スタッフ' },
 ]
 
 const STAFF_LINKS = [
