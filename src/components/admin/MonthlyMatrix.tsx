@@ -33,7 +33,7 @@ export function MonthlyMatrix({ year, month, assignments, onSelectDay }: Monthly
 
   return (
     <div className="overflow-x-auto">
-      <table className="text-sm border-collapse w-full min-w-[900px]">
+      <table className="text-sm border-collapse w-full min-w-[1000px]">
         <thead>
           <tr>
             <th className="w-10 text-left px-2 py-2 text-xs text-gray-400 font-medium sticky left-0 bg-white z-10">スロット</th>
@@ -43,7 +43,7 @@ export function MonthlyMatrix({ year, month, assignments, onSelectDay }: Monthly
                 <th
                   key={d.toISOString()}
                   className={cn(
-                    'min-w-[44px] px-1 py-1.5 text-center text-xs font-medium',
+                    'min-w-[52px] px-1 py-1.5 text-center text-xs font-medium',
                     isWeekend ? 'text-red-400' : 'text-gray-500',
                   )}
                 >
@@ -71,32 +71,40 @@ export function MonthlyMatrix({ year, month, assignments, onSelectDay }: Monthly
               {days.map(d => {
                 const dateStr = format(d, 'yyyy-MM-dd')
                 const day = assignmentMap.get(dateStr)
-                const count = day ? day[slot].length : 0
+                const staff = day ? day[slot] : []
                 const { ngPatterns } = day ? validateDayAssignment(day) : { ngPatterns: [] }
                 const hasNG = slot === 'morning' && ngPatterns.length > 0
-                const isEmpty = count === 0
+                const isEmpty = staff.length === 0
 
                 return (
                   <td
                     key={dateStr}
                     className={cn(
-                      'text-center px-1 py-1.5 cursor-pointer transition-colors',
+                      'px-1 py-1 cursor-pointer transition-colors align-top',
                       isEmpty ? 'bg-red-50' : hasNG ? 'bg-orange-50' : 'hover:bg-gray-50',
                     )}
                     onClick={() => onSelectDay(dateStr)}
                   >
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className={cn(
-                        'text-xs font-medium',
-                        isEmpty ? 'text-red-500' : hasNG ? 'text-orange-600' : 'text-gray-700',
-                      )}>
-                        {count}
-                      </span>
-                      {(isEmpty || hasNG) && (
-                        <AlertTriangle className={cn(
-                          'w-2.5 h-2.5',
-                          isEmpty ? 'text-red-400' : 'text-orange-400',
-                        )} />
+                    <div className="flex flex-col items-center gap-0.5 min-h-[28px] justify-center">
+                      {isEmpty ? (
+                        <AlertTriangle className="w-2.5 h-2.5 text-red-400" />
+                      ) : (
+                        <>
+                          {staff.map(s => (
+                            <span
+                              key={s.staffId}
+                              className={cn(
+                                'text-[11px] font-medium leading-tight',
+                                hasNG ? 'text-orange-600' : 'text-gray-700',
+                              )}
+                            >
+                              {s.fullName.split(/\s+/)[0]}
+                            </span>
+                          ))}
+                          {hasNG && (
+                            <AlertTriangle className="w-2 h-2 text-orange-400 mt-0.5" />
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
