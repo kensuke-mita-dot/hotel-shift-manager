@@ -42,12 +42,18 @@ export async function generateDraft(
 
   if (profiles.length === 0) return { generated: 0, warnings: ['スタッフが登録されていません'] }
 
-  // ── シフト生成 ─────────────────────────────────────────────
-  const shifts = process.env.ANTHROPIC_API_KEY
+  // ── シフト生成（Claude失敗時はスタブにフォールバック） ────
+  let claudeError: string | undefined
+  let shifts = process.env.ANTHROPIC_API_KEY
     ? await generateWithClaude(year, month, profiles, wishes)
     : generateWithStub(year, month, profiles, wishes)
 
-  if ('error' in shifts) return { generated: 0, warnings: [], error: shifts.error }
+  if ('error' in shifts) {
+    claudeError = shifts.error
+    console.warn('Claude API failed, falling back to stub:', claudeError)
+    shifts = generateWithStub(year, month, profiles, wishes)
+    shifts.warnings.unshift(`AIが利用できないためスタブで生成しました（${claudeError}）`)
+  }
 
   // ── DBに保存（当月全削除→挿入） ──────────────────────────
   const { error: delErr } = await admin
