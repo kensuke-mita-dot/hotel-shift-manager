@@ -76,11 +76,16 @@ export async function middleware(request: NextRequest) {
   return supabaseResponse
 }
 
-// プロフィールからロールを取得（管理者チェック時のみ呼ばれる）
+// プロフィールからロールを取得（RLS再帰を避けるため rpc 優先）
 async function getRole(
   supabase: ReturnType<typeof createServerClient>,
   userId: string
 ): Promise<UserRole | null> {
+  // get_my_role() は SECURITY DEFINER で RLS をバイパスするため再帰しない
+  const { data: roleFromRpc, error: rpcError } = await supabase.rpc('get_my_role')
+  if (!rpcError && roleFromRpc) return roleFromRpc as UserRole
+
+  // フォールバック：profiles を直接参照
   const { data } = await supabase
     .from('profiles')
     .select('role')

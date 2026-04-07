@@ -23,22 +23,37 @@ export async function loginAction(
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    // Supabase のエラーメッセージを日本語に変換
     const msg = SUPABASE_ERROR_MAP[error.message] ?? 'ログインに失敗しました'
     return { error: msg }
   }
 
-  // ロールを取得して遷移先を決定
+  // ロール取得：RLSエラー時も安全にフォールバック
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ユーザー情報の取得に失敗しました' }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  let dest = '/staff/wishes' // デフォルト
 
-  const dest = profile?.role === 'admin' ? '/admin/daily' : '/staff/wishes'
+  try {
+    // get_my_role() 関数を経由（RLS再帰を回避）
+    const { data: roleRow } = await supabase
+      .rpc('get_my_role')
+
+    if (roleRow === 'admin') {
+      dest = '/admin/daily'
+    }
+  } catch {
+    // フォールバック：profiles テーブルを直接参照
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role === 'admin') {
+      dest = '/admin/daily'
+    }
+  }
+
   redirect(dest)
 }
 
