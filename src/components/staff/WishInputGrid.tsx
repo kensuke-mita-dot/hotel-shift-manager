@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import { format, eachDayOfInterval, startOfMonth, endOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Save } from 'lucide-react'
+import { Save, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { saveWishes } from '@/app/actions/wishes'
 import { WISH_LABEL, SLOT_META } from '@/types'
 import type { WishType, ShiftSlot } from '@/types'
 
@@ -20,32 +21,46 @@ const WISH_STYLE: Record<WishType, string> = {
 }
 
 interface WishInputGridProps {
-  year:    number
-  month:   number
-  staffId: string
+  year:         number
+  month:        number
+  staffId:      string
+  initialWishes: Record<string, WishType>
 }
 
-export function WishInputGrid({ year, month, staffId }: WishInputGridProps) {
+export function WishInputGrid({ year, month, staffId, initialWishes }: WishInputGridProps) {
   const days = eachDayOfInterval({
     start: startOfMonth(new Date(year, month - 1)),
     end:   endOfMonth(new Date(year, month - 1)),
   })
 
-  const [wishes, setWishes] = useState<Record<string, WishType>>(() =>
-    Object.fromEntries(days.map(d => [format(d, 'yyyy-MM-dd'), 'off']))
-  )
+  // 初期値：Supabaseから取得した hopes をベースに、未設定日は 'off'
+  const [wishes, setWishes] = useState<Record<string, WishType>>(() => {
+    const base = Object.fromEntries(days.map(d => [format(d, 'yyyy-MM-dd'), 'off' as WishType]))
+    return { ...base, ...initialWishes }
+  })
+
+  const [isPending, startTransition] = useTransition()
+  const [isSaving, setIsSaving] = useState(false)
 
   const setWish = (date: string, wish: WishType) =>
     setWishes(prev => ({ ...prev, [date]: wish }))
 
-  const handleSave = async () => {
-    // TODO: Supabase upsert
-    // const rows = Object.entries(wishes).map(([wish_date, wish]) => ({
-    //   staff_id: staffId, wish_date, wish
-    // }))
-    // await supabase.from('shift_wishes').upsert(rows, { onConflict: 'staff_id,wish_date' })
-    toast.success('希望を保存しました')
-  }
+  const handleSave = useCallback(async () => {
+    setIsSaving(true)
+    try {
+      const result = await saveWishes(staffId, wishes)
+      if (result.error) {
+        toast.error(`保存に失敗しました: ${result.error}`)
+      } else {
+        toast.success(`${year}年${month}月の希望を保存しました`)
+        startTransition(() => {})  // Server Componentを再レンダリング
+      }
+    } catch (e) {
+      toast.error('保存中にエラーが発生しました')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [staffId, wishes, year, month, startTransition])
 
   return (
     <div>
@@ -53,16 +68,19 @@ export function WishInputGrid({ year, month, staffId }: WishInputGridProps) {
         <h2 className="text-lg font-semibold text-gray-900">
           {year}年{month}月の希望入力
         </h2>
-        <Button onClick={handleSave}>
-          <Save className="w-4 h-4 mr-2" />
-          保存する
+        <Button onClick={handleSave} disabled={isSaving || isPending}>
+          {isSaving ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中...</>
+          ) : (
+            <><Save className="w-4 h-4 mr-2" />保存する</>
+          )}
         </Button>
       </div>
 
       <div className="space-y-2">
         {days.map(d => {
-          const dateStr = format(d, 'yyyy-MM-dd')
-          const wish    = wishes[dateStr]
+          const dateStr   = format(d, 'yyyy-MM-dd')
+          const wish      = wishes[dateStr]
           const isWeekend = d.getDay() === 0 || d.getDay() === 6
 
           return (
@@ -71,17 +89,18 @@ export function WishInputGrid({ year, month, staffId }: WishInputGridProps) {
               className="flex items-center gap-3 py-2 border-b border-gray-100"
             >
               <div className={cn(
-                'w-20 text-sm',
+                'w-20 text-sm flex-shrink-0',
                 isWeekend ? 'text-red-500 font-medium' : 'text-gray-600',
               )}>
                 {format(d, 'M/d（E）', { locale: ja })}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {WISH_OPTIONS.map(opt => (
                   <button
                     key={opt}
                     onClick={() => setWish(dateStr, opt)}
+                    disabled={isSaving || isPending}
                     className={cn(
                       'px-3 py-1 rounded-full text-xs border transition-all',
                       wish === opt

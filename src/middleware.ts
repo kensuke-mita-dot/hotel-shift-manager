@@ -53,8 +53,12 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // ── API ルートはミドルウェアをスキップ ──────────────────────────
+  // ── API ルート / Server Action はミドルウェアをスキップ ─────────
   if (pathname.startsWith('/api')) {
+    return supabaseResponse
+  }
+  // Next.js Server Action（POST + next-action ヘッダー）はリダイレクト不要
+  if (request.headers.has('next-action')) {
     return supabaseResponse
   }
 
