@@ -8,6 +8,16 @@ export type AuthState =
   | { status: 'idle' }
   | { status: 'sent'; email: string }
   | { status: 'error'; message: string }
+  | { status: 'verified' }
+
+/** リクエストの origin を取得（プレビューURLでも正しく動く） */
+async function getOrigin(): Promise<string> {
+  const headersList = await headers()
+  // x-forwarded-host が優先（Vercel プレビューなど）
+  const host = headersList.get('x-forwarded-host') ?? headersList.get('host') ?? 'localhost:3000'
+  const proto = headersList.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
+  return `${proto}://${host}`
+}
 
 /** メールリンク（OTP）を送信する */
 export async function loginAction(
@@ -20,11 +30,7 @@ export async function loginAction(
     return { status: 'error', message: 'メールアドレスを入力してください' }
   }
 
-  const headersList = await headers()
-  const host   = headersList.get('host') ?? ''
-  const proto  = process.env.APP_URL?.startsWith('https') ? 'https' : 'http'
-  const origin = process.env.APP_URL ?? `${proto}://${host}`
-  const emailRedirectTo = `${origin}/auth/callback`
+  const emailRedirectTo = `${await getOrigin()}/auth/callback`
 
   const supabase = createClient()
   const { error } = await supabase.auth.signInWithOtp({
@@ -36,12 +42,33 @@ export async function loginAction(
   })
 
   if (error) {
-    // 登録されていないメールアドレスでも同じ表示にする（登録の有無を知られないため）
     console.error('[loginAction] OTP error:', error.message)
   }
 
-  // 成功・失敗どちらも「送信しました」を返す
   return { status: 'sent', email }
+}
+
+/** 6桁コードでログインを確認する */
+export async function verifyOtpAction(
+  _prevState: AuthState,
+  formData: FormData
+): Promise<AuthState> {
+  const email = (formData.get('email') as string | null)?.trim() ?? ''
+  const token = (formData.get('token') as string | null)?.replace(/\s/g, '') ?? ''
+
+  if (!token || token.length !== 6) {
+    return { status: 'error', message: '6桁のコードを入力してください' }
+  }
+
+  const supabase = createClient()
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+
+  if (error) {
+    console.error('[verifyOtpAction] verify error:', error.message)
+    return { status: 'error', message: 'コードが正しくないか、有効期限が切れています' }
+  }
+
+  redirect('/staff/requests')
 }
 
 /** ログアウト */

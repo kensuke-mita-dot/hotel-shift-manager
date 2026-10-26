@@ -1,12 +1,11 @@
 'use client'
 
-import { useFormState } from 'react-dom'
-import { useFormStatus } from 'react-dom'
-import { loginAction, type AuthState } from '@/app/actions/auth'
+import { useFormState, useFormStatus } from 'react-dom'
+import { loginAction, verifyOtpAction, type AuthState } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useRef } from 'react'
 
 const initial: AuthState = { status: 'idle' }
 
@@ -18,7 +17,7 @@ export default function LoginPage() {
   )
 }
 
-function SubmitButton() {
+function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return (
     <Button
@@ -32,16 +31,24 @@ function SubmitButton() {
           送信中...
         </>
       ) : (
-        'ログイン用リンクを送る'
+        label
       )}
     </Button>
   )
 }
 
 function LoginForm() {
-  const [state, formAction] = useFormState(loginAction, initial)
+  const [emailState, emailAction] = useFormState(loginAction, initial)
+  const [otpState, otpAction] = useFormState(verifyOtpAction, initial)
   const searchParams = useSearchParams()
   const isInactive = searchParams.get('error') === 'inactive'
+
+  // メール送信後の状態
+  const sent = emailState.status === 'sent'
+  const sentEmail = sent ? emailState.email : ''
+
+  // OTP 検証中のエラー
+  const otpError = otpState.status === 'error' ? otpState.message : null
 
   return (
     <div className="min-h-screen bg-hs-gray-lighter flex items-center justify-center p-4">
@@ -65,27 +72,13 @@ function LoginForm() {
             </div>
           )}
 
-          {state.status === 'sent' ? (
-            /* 送信完了画面 */
-            <div className="text-center py-2 space-y-3">
-              <div className="text-4xl">✉️</div>
-              <p className="text-sm text-hs-text">
-                <span className="font-medium">{state.email}</span> にリンクを送りました。
-              </p>
-              <p className="text-sm text-hs-text-sub">
-                メールのリンクを開くとログインできます。
-              </p>
-              <p className="text-xs text-hs-text-lighter mt-4">
-                メールが届かない場合はスパムフォルダをご確認ください。
-              </p>
-            </div>
-          ) : (
-            /* メールアドレス入力フォーム */
-            <form action={formAction} className="space-y-4">
+          {!sent ? (
+            /* ── メールアドレス入力フォーム ── */
+            <form action={emailAction} className="space-y-4">
 
-              {state.status === 'error' && (
+              {emailState.status === 'error' && (
                 <div className="bg-hs-danger-bg border border-hs-danger-border rounded-btn px-4 py-3 text-sm text-hs-danger">
-                  {state.message}
+                  {emailState.message}
                 </div>
               )}
 
@@ -106,8 +99,72 @@ function LoginForm() {
                 />
               </div>
 
-              <SubmitButton />
+              <SubmitButton label="ログイン用リンクを送る" />
             </form>
+
+          ) : (
+            /* ── メール送信後：リンク案内 ＋ 6桁コード入力 ── */
+            <div className="space-y-5">
+
+              {/* 送信完了メッセージ */}
+              <div className="text-center py-2 space-y-2">
+                <div className="text-4xl">✉️</div>
+                <p className="text-sm text-hs-text">
+                  <span className="font-medium">{sentEmail}</span> にメールを送りました。
+                </p>
+                <p className="text-sm text-hs-text-sub">
+                  メール内のリンクを開くか、下の欄に6桁のコードを入力してください。
+                </p>
+              </div>
+
+              {/* 遅延案内 */}
+              <p className="text-xs text-center text-hs-text-lighter leading-relaxed">
+                メールが届くまで1〜2分かかることがあります。<br />
+                迷惑メールのフォルダも確認してください。
+              </p>
+
+              {/* 6桁コード入力フォーム */}
+              <form action={otpAction} className="space-y-3">
+                <input type="hidden" name="email" value={sentEmail} />
+
+                {otpError && (
+                  <div className="bg-hs-danger-bg border border-hs-danger-border rounded-btn px-4 py-3 text-sm text-hs-danger">
+                    {otpError}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label htmlFor="token" className="block text-sm font-medium text-hs-text">
+                    6桁のコード
+                  </label>
+                  <input
+                    id="token"
+                    name="token"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="123456"
+                    className="w-full rounded-btn border border-hs-input-border px-3 py-2 text-sm text-center
+                      tracking-[0.3em] font-mono outline-none focus:border-hs-blue focus:ring-2
+                      focus:ring-hs-blue/20 transition-colors placeholder:text-hs-text-lighter"
+                  />
+                </div>
+
+                <SubmitButton label="コードでログイン" />
+              </form>
+
+              {/* 別のメールで送り直す */}
+              <p className="text-center text-xs text-hs-text-lighter">
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="underline hover:text-hs-text transition-colors"
+                >
+                  別のメールアドレスで試す
+                </button>
+              </p>
+            </div>
           )}
         </div>
 
