@@ -6,6 +6,7 @@ import { BottomSheet } from '@/components/layout/BottomSheet'
 import { saveAndSubmitRequests } from '@/app/actions/requests'
 import type { RequestType, ShiftRequest, FacilitySlot } from '@/types'
 import { REQUEST_LABEL } from '@/types'
+import { fmtTimeRange } from '@/lib/time'
 
 // ─── Calendar constants (December 2026) ─────────────────────────
 
@@ -32,14 +33,9 @@ function dowOfDay(d: number) {
 
 // ─── Time helpers ────────────────────────────────────────────────
 
-function fmtHour(t: string): string {
-  const [h, m] = t.split(':').map(Number)
-  return m === 0 ? String(h) : `${h}:${String(m).padStart(2, '0')}`
-}
-
 function slotTimeLabel(slots: FacilitySlot[], key: string): string {
   const s = slots.find(sl => sl.key === key)
-  return s ? `${fmtHour(s.start_time)}-${fmtHour(s.end_time)}` : ''
+  return s ? fmtTimeRange(s.start_time, s.end_time) : ''
 }
 
 function fmtSubmitted(iso: string): string {
@@ -214,7 +210,7 @@ export function WishCalendar({
       <div className="grid grid-cols-7 border-b border-hs-border">
         {CALENDAR_CELLS.map((d, i) => {
           if (!d) {
-            return <div key={`pad-${i}`} className="border-r border-b border-hs-border" style={{ height: 58 }} />
+            return <div key={`pad-${i}`} className="border-r border-b border-hs-border" style={{ height: 64 }} />
           }
           const ds = dateStr(d)
           const entry = local.get(ds)
@@ -227,18 +223,18 @@ export function WishCalendar({
               key={ds}
               onClick={() => handleDayClick(d)}
               disabled={isLocked}
-              className={`border-r border-b border-hs-border text-left p-1.5 transition-colors active:opacity-70 ${bg}`}
-              style={{ height: 58 }}
+              className={`border-r border-b border-hs-border text-left p-1.5 overflow-hidden transition-colors active:opacity-70 ${bg}`}
+              style={{ height: 64 }}
             >
-              <span className={`text-xs font-medium ${dayColor}`}>{d}</span>
+              <span className={`text-xs font-medium leading-none ${dayColor}`}>{d}</span>
               {entry && (
                 <div className="mt-0.5">
-                  <span className={`text-xs font-bold ${entry.type === 'off' ? 'text-orange-500' : 'text-hs-blue'}`}>
+                  <span className={`text-xs font-bold leading-tight ${entry.type === 'off' ? 'text-orange-500' : 'text-hs-blue'}`}>
                     {REQUEST_LABEL[entry.type]}
                   </span>
                   {entry.type === 'custom' && entry.start_time && entry.end_time && (
-                    <div className="text-[10px] text-hs-text-sub leading-tight">
-                      {fmtHour(entry.start_time)}-{fmtHour(entry.end_time)}
+                    <div className="text-[11px] font-medium text-hs-blue leading-tight whitespace-nowrap overflow-hidden">
+                      {fmtTimeRange(entry.start_time, entry.end_time)}
                     </div>
                   )}
                 </div>
