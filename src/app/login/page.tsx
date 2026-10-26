@@ -5,7 +5,7 @@ import { loginAction, verifyOtpAction, type AuthState } from '@/app/actions/auth
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useRef } from 'react'
+import { Suspense } from 'react'
 
 const initial: AuthState = { status: 'idle' }
 
