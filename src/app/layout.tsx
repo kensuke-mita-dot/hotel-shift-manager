@@ -1,28 +1,36 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { Toaster } from "sonner";
-import { Navbar } from "@/components/layout/Navbar";
-
-const inter = Inter({ subsets: ["latin"] });
+import type { Metadata, Viewport } from 'next'
+import './globals.css'
+import { Toaster } from 'sonner'
+import { Navbar } from '@/components/layout/Navbar'
 
 export const metadata: Metadata = {
-  title: "ホテルシフト管理",
-  description: "ホテル向けシフト管理システム MVP",
-};
+  title: 'HOTEL SHIFT',
+  description: 'ホテル向けシフト管理システム',
+  manifest: '/manifest.json',
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'HOTEL SHIFT' },
+}
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body className={inter.className}>
+      <body>
         <Navbar />
         <main>{children}</main>
-        <Toaster richColors position="top-right" />
+        {/* 黒地・白文字・2.2秒 */}
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            style: { background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: '8px' },
+            duration: 2200,
+          }}
+        />
       </body>
     </html>
-  );
+  )
 }

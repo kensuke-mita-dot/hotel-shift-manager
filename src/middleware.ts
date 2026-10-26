@@ -1,11 +1,10 @@
 // src/middleware.ts
-// 認証チェック + ロール別ルーティング
+// 認証チェック + ロール別ルーティング + 停止ユーザーのログアウト
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { UserRole } from '@/types'
 
 export async function middleware(request: NextRequest) {
-  // Supabase env が未設定ならスルー（ビルド・CI 環境向け）
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return NextResponse.next({ request })
   }
@@ -33,32 +32,29 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // ── セッション更新（必須：トークンリフレッシュ） ──────────────────
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // セッション更新（トークンリフレッシュのために必須）
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
 
-  // ── パブリックルート ─────────────────────────────────────────────
+  // ── パブリックルート ──────────────────────────────────────────────
   const isPublic = pathname.startsWith('/login') || pathname.startsWith('/auth')
 
   if (isPublic) {
     if (user) {
-      // ログイン済みならロールに応じてリダイレクト
-      const role = await getRole(supabase, user.id)
-      const dest = role === 'admin' ? '/admin/daily' : '/staff/wishes'
+      const dest = await getDestination(supabase, user.id)
+      if (dest === 'inactive') {
+        // 停止済みアカウント：ログアウトしてエラー表示
+        await supabase.auth.signOut()
+        return NextResponse.redirect(new URL('/login?error=inactive', request.url))
+      }
       return NextResponse.redirect(new URL(dest, request.url))
     }
     return supabaseResponse
   }
 
-  // ── API ルート / Server Action はミドルウェアをスキップ ─────────
-  if (pathname.startsWith('/api')) {
-    return supabaseResponse
-  }
-  // Next.js Server Action（POST + next-action ヘッダー）はリダイレクト不要
-  if (request.headers.has('next-action')) {
+  // ── API / Server Action はスキップ ───────────────────────────────
+  if (pathname.startsWith('/api') || request.headers.has('next-action')) {
     return supabaseResponse
   }
 
@@ -69,38 +65,42 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // ── 停止ユーザーのチェック ────────────────────────────────────────
+  const dest = await getDestination(supabase, user.id)
+  if (dest === 'inactive') {
+    await supabase.auth.signOut()
+    return NextResponse.redirect(new URL('/login?error=inactive', request.url))
+  }
+
   // ── 管理者ルートのロールチェック ─────────────────────────────────
-  if (pathname.startsWith('/admin')) {
-    const role = await getRole(supabase, user.id)
-    if (role !== 'admin') {
-      return NextResponse.redirect(new URL('/staff/wishes', request.url))
-    }
+  if (pathname.startsWith('/admin') && dest !== '/admin/daily') {
+    return NextResponse.redirect(new URL('/staff/requests', request.url))
+  }
+
+  // ── スタッフが管理者ルートに来た場合も弾く ────────────────────────
+  if (pathname.startsWith('/staff') && dest === '/admin/daily') {
+    // 管理者がスタッフ画面に来た場合は通す（確認用途として許可）
   }
 
   return supabaseResponse
 }
 
-// プロフィールからロールを取得（RLS再帰を避けるため rpc 優先）
-async function getRole(
+async function getDestination(
   supabase: ReturnType<typeof createServerClient>,
   userId: string
-): Promise<UserRole | null> {
-  // get_my_role() は SECURITY DEFINER で RLS をバイパスするため再帰しない
-  const { data: roleFromRpc, error: rpcError } = await supabase.rpc('get_my_role')
-  if (!rpcError && roleFromRpc) return roleFromRpc as UserRole
-
-  // フォールバック：profiles を直接参照
-  const { data } = await supabase
+): Promise<'/admin/daily' | '/staff/requests' | 'inactive'> {
+  const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active')
     .eq('id', userId)
     .single()
-  return data?.role ?? null
+
+  if (!profile?.is_active) return 'inactive'
+  return profile?.role === 'admin' ? '/admin/daily' : '/staff/requests'
 }
 
 export const config = {
   matcher: [
-    // 静的ファイル・_next を除く全ルート
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

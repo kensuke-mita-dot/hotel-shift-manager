@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<script src="_ds/industry-a66ce12f-4b36-4199-84e1-2cb02b309fa5/_ds_bundle.js"></script>
+<style>body{margin:0;background:#f5f6f7;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif}a{color:#1f72b8}a:hover{color:#195d96}</style>
+</helmet>
+<section id="t1" style="padding:40px 44px 48px;display:flex;flex-direction:column;gap:24px;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;color:#333333">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:880px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <a href="#t1" style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#333333;color:#ffffff;text-decoration:none">1</a>
+      <h2 style="margin:0;font-size:22px;font-weight:700">ホテル シフト管理 — 画面モック</h2>
+    </div>
+    <p style="margin:0;font-size:13px;color:#5f646b;text-wrap:pretty">ダミーデータ（5施設・27名・2026年11月、今日＝10/20）。要件定義 v0.2 を反映しています。施設ごとのシフト枠（MAHTは「基本」1枠、MAHBは朝10時開始）と最低人数、兼任スタッフ（BHJ・MAHT・MAHBの一部）、施設をまたいだ勤務間インターバル（8時間）と同じ時間の重複のチェック、夜勤の休憩3時間と勤続に応じた交通費上限、希望提出期限（10/15）の個別延長に対応しました。スタッフ表示の高橋さんはBHJ・MAHTの兼任で、10/25まで期限が延長されています。</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <div id="1a" style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:8px;font-size:12px;color:#5f646b"><a href="#1a" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#e3e5e8;color:#333333;text-decoration:none">1a</a>スタッフ · スマホ（希望入力／確定シフト）</div>
+      <div style="border:1px solid #e3e5e8;border-radius:8px;position:relative;overflow:hidden;border-radius:28px;width:390px;height:844px;background:#ffffff;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+        <dc-import name="ShiftApp" layout="phone" default-role="staff" hint-size="390px,844px"></dc-import>
+      </div>
+    </div>
+    <div id="1b" style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:8px;font-size:12px;color:#5f646b"><a href="#1b" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#e3e5e8;color:#333333;text-decoration:none">1b</a>管理者 · スマホ · 日次調整 案A「枠に入れる」</div>
+      <div style="border:1px solid #e3e5e8;border-radius:8px;position:relative;overflow:hidden;border-radius:28px;width:390px;height:844px;background:#ffffff;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+        <dc-import name="ShiftApp" layout="phone" default-role="admin" daily-variant="slots" hint-size="390px,844px"></dc-import>
+      </div>
+    </div>
+    <div id="1c" style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:8px;font-size:12px;color:#5f646b"><a href="#1c" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#e3e5e8;color:#333333;text-decoration:none">1c</a>管理者 · スマホ · 日次調整 案B「人から選ぶ」</div>
+      <div style="border:1px solid #e3e5e8;border-radius:8px;position:relative;overflow:hidden;border-radius:28px;width:390px;height:844px;background:#ffffff;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+        <dc-import name="ShiftApp" layout="phone" default-role="admin" daily-variant="people" hint-size="390px,844px"></dc-import>
+      </div>
+    </div>
+  </div>
+  <div id="1d" style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:8px;font-size:12px;color:#5f646b"><a href="#1d" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#e3e5e8;color:#333333;text-decoration:none">1d</a>管理者 · PC（全施設一覧から開始。施設を選ぶと日次調整／月間／人件費）</div>
+    <div style="border:1px solid #e3e5e8;border-radius:8px;position:relative;overflow:hidden;border-radius:10px;width:1280px;height:820px;background:#ffffff;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+      <dc-import name="ShiftApp" layout="desktop" default-role="admin" default-facility="all" hint-size="1280px,820px"></dc-import>
+    </div>
+  </div>
+  <p style="margin:0;font-size:12px;color:#80858c">次の候補：「<a href="#1b">1b</a> と <a href="#1c">1c</a> を1画面で切り替え可能に」「<a href="#1d">1d</a> の月間マトリックスに人時・人件費の日別行を追加」「NG判定に連勤日数の上限を追加」</p>
+</section>
+</x-dc>
+</body>
+</html>

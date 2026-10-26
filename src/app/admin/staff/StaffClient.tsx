@@ -58,6 +58,7 @@ export function StaffClient({ initialStaff, currentUserId }: Props) {
   const handleRoleToggle = (member: StaffMember) => {
     const newRole: UserRole = member.role === 'staff' ? 'admin' : 'staff'
     const label = newRole === 'admin' ? '管理者' : 'スタッフ'
+    if (!confirm(`${member.fullName} のロールを「${label}」に変更しますか？`)) return
     startTransition(async () => {
       const result = await updateRole(member.id, newRole)
       if (result.error) {

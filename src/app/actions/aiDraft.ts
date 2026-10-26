@@ -2,7 +2,10 @@
 
 import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
-import type { ShiftSlot, WishType } from '@/types'
+
+// Phase 2 まで旧スキーマ向けのローカル型（新スキーマ対応は Phase 2 で実装）
+type ShiftSlot = 'morning' | 'evening' | 'night'
+type WishType  = 'morning' | 'evening' | 'night' | 'off'
 
 interface DraftShift {
   staff_id:   string
@@ -101,10 +104,11 @@ function generateWithStub(
   )
 
   // 希望マップ: date → staffId → wish
-  const wishMap = new Map<string, Map<string, WishType>>()
+  const parseWish = (raw: unknown): WishType[] => Array.isArray(raw) ? (raw.length > 0 ? raw as WishType[] : ['off']) : [raw as WishType ?? 'off']
+  const wishMap = new Map<string, Map<string, WishType[]>>()
   for (const w of wishes) {
     if (!wishMap.has(w.wish_date)) wishMap.set(w.wish_date, new Map())
-    wishMap.get(w.wish_date)!.set(w.staff_id, w.wish as WishType)
+    wishMap.get(w.wish_date)!.set(w.staff_id, parseWish(w.wish))
   }
 
   const rows: DraftShift[]  = []
@@ -114,14 +118,14 @@ function generateWithStub(
   let prevNightIds = new Set<string>()
 
   for (const date of days) {
-    const dayWish = wishMap.get(date) ?? new Map<string, WishType>()
+    const dayWish = wishMap.get(date) ?? new Map<string, WishType[]>()
     const slots: ShiftSlot[] = ['morning', 'evening', 'night']
     const assignedToday = new Set<string>()
 
     for (const slot of slots) {
       // 1. その日のslotを希望している人
       const preferred = staffIds.filter(id =>
-        dayWish.get(id) === slot &&
+        (dayWish.get(id) ?? ['off']).includes(slot) &&
         !assignedToday.has(id) &&
         !(slot === 'morning' && prevNightIds.has(id))
       )
@@ -129,7 +133,7 @@ function generateWithStub(
       // 2. 希望者がいない場合は未配置のスタッフから補填
       const fallback = staffIds.filter(id =>
         !assignedToday.has(id) &&
-        dayWish.get(id) !== 'off' &&
+        !(dayWish.get(id) ?? ['off']).every(w => w === 'off') &&
         !(slot === 'morning' && prevNightIds.has(id))
       )
 
@@ -207,7 +211,7 @@ ${wishes.map(w => `- ${nameMap.get(w.staff_id) ?? w.staff_id}: ${w.wish_date} ${
 
     const message = await client.messages.create({
       model:      'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages:   [{ role: 'user', content: prompt }],
     })
 

@@ -2,59 +2,46 @@
 
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 
-export type AuthState = {
-  error?: string
-}
+export type AuthState =
+  | { status: 'idle' }
+  | { status: 'sent'; email: string }
+  | { status: 'error'; message: string }
 
-/** メール/パスワードでログイン */
+/** メールリンク（OTP）を送信する */
 export async function loginAction(
   _prevState: AuthState,
   formData: FormData
 ): Promise<AuthState> {
-  const email    = formData.get('email')    as string
-  const password = formData.get('password') as string
+  const email = (formData.get('email') as string | null)?.trim() ?? ''
 
-  if (!email || !password) {
-    return { error: 'メールアドレスとパスワードを入力してください' }
+  if (!email) {
+    return { status: 'error', message: 'メールアドレスを入力してください' }
   }
+
+  const headersList = await headers()
+  const host   = headersList.get('host') ?? ''
+  const proto  = process.env.APP_URL?.startsWith('https') ? 'https' : 'http'
+  const origin = process.env.APP_URL ?? `${proto}://${host}`
+  const emailRedirectTo = `${origin}/auth/callback`
 
   const supabase = createClient()
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo,
+    },
+  })
 
   if (error) {
-    const msg = SUPABASE_ERROR_MAP[error.message] ?? 'ログインに失敗しました'
-    return { error: msg }
+    // 登録されていないメールアドレスでも同じ表示にする（登録の有無を知られないため）
+    console.error('[loginAction] OTP error:', error.message)
   }
 
-  // ロール取得：RLSエラー時も安全にフォールバック
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'ユーザー情報の取得に失敗しました' }
-
-  let dest = '/staff/wishes' // デフォルト
-
-  try {
-    // get_my_role() 関数を経由（RLS再帰を回避）
-    const { data: roleRow } = await supabase
-      .rpc('get_my_role')
-
-    if (roleRow === 'admin') {
-      dest = '/admin/daily'
-    }
-  } catch {
-    // フォールバック：profiles テーブルを直接参照
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role === 'admin') {
-      dest = '/admin/daily'
-    }
-  }
-
-  redirect(dest)
+  // 成功・失敗どちらも「送信しました」を返す
+  return { status: 'sent', email }
 }
 
 /** ログアウト */
@@ -62,13 +49,4 @@ export async function logoutAction() {
   const supabase = createClient()
   await supabase.auth.signOut()
   redirect('/login')
-}
-
-const SUPABASE_ERROR_MAP: Record<string, string> = {
-  'Invalid login credentials':
-    'メールアドレスまたはパスワードが正しくありません',
-  'Email not confirmed':
-    'メールアドレスが確認されていません。確認メールをご確認ください',
-  'Too many requests':
-    'ログイン試行回数が上限に達しました。しばらく時間をおいてお試しください',
 }

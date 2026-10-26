@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
-import { revalidatePath } from 'next/cache'
 import type { UserRole } from '@/types'
 
 export interface StaffMember {
@@ -55,7 +54,6 @@ export async function inviteStaff(
         .upsert({ id: data.user.id, full_name: fullName, email: email.trim(), role: 'staff' })
     }
 
-    revalidatePath('/admin/staff')
     return {}
   } catch (e: any) {
     return { error: e.message }
@@ -74,7 +72,6 @@ export async function updateRole(
     .eq('id', userId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/staff')
   return {}
 }
 
@@ -85,7 +82,6 @@ export async function removeStaff(userId: string): Promise<{ error?: string }> {
     const { error } = await adminClient.auth.admin.deleteUser(userId)
     if (error) return { error: error.message }
 
-    revalidatePath('/admin/staff')
     return {}
   } catch (e: any) {
     return { error: e.message }
