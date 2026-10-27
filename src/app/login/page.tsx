@@ -51,7 +51,7 @@ function LoginForm() {
   const otpError = otpState.status === 'error' ? otpState.message : null
 
   return (
-    <div className="min-h-screen bg-hs-gray-lighter flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-hs-gray-lighter flex items-center justify-center p-4 pb-[calc(env(safe-area-inset-bottom)+80px)]">
       <div className="w-full max-w-sm">
 
         {/* ロゴ */}
@@ -86,6 +86,9 @@ function LoginForm() {
                 <label htmlFor="email" className="block text-sm font-medium text-hs-text">
                   メールアドレス
                 </label>
+                <p className="text-xs text-hs-text-lighter">
+                  アカウントをお持ちでない方は管理者にお問い合わせください
+                </p>
                 <input
                   id="email"
                   name="email"
@@ -93,7 +96,7 @@ function LoginForm() {
                   autoComplete="email"
                   required
                   placeholder="you@example.com"
-                  className="w-full rounded-btn border border-hs-input-border px-3 py-2 text-sm
+                  className="w-full rounded-btn border border-hs-input-border px-3 py-2 text-base
                     outline-none focus:border-hs-blue focus:ring-2 focus:ring-hs-blue/20
                     transition-colors placeholder:text-hs-text-lighter"
                 />
@@ -145,7 +148,7 @@ function LoginForm() {
                     autoComplete="one-time-code"
                     maxLength={6}
                     placeholder="123456"
-                    className="w-full rounded-btn border border-hs-input-border px-3 py-2 text-sm text-center
+                    className="w-full rounded-btn border border-hs-input-border px-3 py-2 text-base text-center
                       tracking-[0.3em] font-mono outline-none focus:border-hs-blue focus:ring-2
                       focus:ring-hs-blue/20 transition-colors placeholder:text-hs-text-lighter"
                   />
@@ -168,9 +171,6 @@ function LoginForm() {
           )}
         </div>
 
-        <p className="text-center text-xs text-hs-text-lighter mt-6">
-          アカウントをお持ちでない方は管理者にお問い合わせください
-        </p>
       </div>
     </div>
   )

@@ -174,7 +174,7 @@ export function WishCalendar({
   }
 
   return (
-    <div className="pb-24">
+    <div className="pb-[calc(env(safe-area-inset-bottom)+96px)]">
       {/* ─── ヘッダー ─── */}
       <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-2">
         <div>
@@ -262,7 +262,7 @@ export function WishCalendar({
       </div>
 
       {/* ─── 提出ボタン（fixed） ─── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-hs-border p-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-hs-border px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
         <button
           onClick={handleSubmitClick}
           disabled={isPending || isLocked}
