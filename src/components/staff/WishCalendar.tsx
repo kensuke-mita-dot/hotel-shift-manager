@@ -196,51 +196,61 @@ export function WishCalendar({
         </div>
       )}
 
-      {/* ─── 曜日ヘッダー ─── */}
-      <div className="grid grid-cols-7 border-b border-hs-border">
-        {DAY_NAMES.map((d, i) => (
-          <div key={d} className={`py-1.5 text-center text-xs font-medium
-            ${i === 0 ? 'text-hs-danger' : i === 6 ? 'text-hs-blue' : 'text-hs-text-sub'}`}>
-            {d}
-          </div>
-        ))}
-      </div>
+      {/* ─── カレンダー外枠 ─── */}
+      <div className="border border-hs-border">
 
-      {/* ─── カレンダーグリッド ─── */}
-      <div className="grid grid-cols-7 border-b border-hs-border">
-        {CALENDAR_CELLS.map((d, i) => {
-          if (!d) {
-            return <div key={`pad-${i}`} className="border-r border-b border-hs-border min-h-[64px]" />
-          }
-          const ds = dateStr(d)
-          const entry = local.get(ds)
-          const dow = dowOfDay(d)
-          const bg = entry?.type === 'off' ? 'bg-[#fdf0e6]' : entry ? 'bg-[#eaf4fd]' : 'bg-white'
-          const dayColor = dow === 0 ? 'text-hs-danger' : dow === 6 ? 'text-hs-blue' : 'text-hs-text'
-
-          return (
-            <button
-              key={ds}
-              onClick={() => handleDayClick(d)}
-              disabled={isLocked}
-              className={`border-r border-b border-hs-border text-left p-1.5 min-h-[64px] transition-colors active:opacity-70 ${bg}`}
+        {/* 曜日ヘッダー */}
+        <div className="grid grid-cols-7">
+          {DAY_NAMES.map((d, i) => (
+            <div
+              key={d}
+              className={`py-1.5 text-center text-xs font-medium border-b border-r border-hs-border
+                ${i === 0 ? 'text-hs-danger' : i === 6 ? 'text-hs-blue' : 'text-hs-text-sub'}`}
             >
-              <span className={`block text-xs font-medium leading-none ${dayColor}`}>{d}</span>
-              {entry && (
-                <div className="mt-[3px]">
-                  <span className={`block text-xs font-bold leading-none ${entry.type === 'off' ? 'text-orange-500' : 'text-hs-blue'}`}>
-                    {REQUEST_LABEL[entry.type]}
-                  </span>
-                  {entry.type === 'custom' && entry.start_time && entry.end_time && (
-                    <span className="block text-[11px] font-medium text-hs-blue leading-none mt-[2px] overflow-hidden whitespace-nowrap">
-                      {fmtTimeRange(entry.start_time, entry.end_time)}
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* カレンダーグリッド */}
+        <div className="grid grid-cols-7">
+          {CALENDAR_CELLS.map((d, i) => {
+            if (!d) {
+              return <div key={`pad-${i}`} className="border-b border-r border-hs-border h-[72px]" />
+            }
+            const ds = dateStr(d)
+            const entry = local.get(ds)
+            const dow = dowOfDay(d)
+            const bg = entry?.type === 'off' ? 'bg-[#fdf0e6]' : entry ? 'bg-[#eaf4fd]' : 'bg-white'
+            const dayColor = dow === 0 ? 'text-hs-danger' : dow === 6 ? 'text-hs-blue' : 'text-hs-text'
+
+            return (
+              <button
+                key={ds}
+                onClick={() => handleDayClick(d)}
+                disabled={isLocked}
+                className={`border-b border-r border-hs-border text-left pt-2 px-2 pb-1
+                  h-[72px] overflow-hidden align-top
+                  transition-colors active:opacity-70 ${bg}`}
+              >
+                <span className={`block text-xs font-medium leading-[1.25] ${dayColor}`}>{d}</span>
+                {entry && (
+                  <div className="mt-1">
+                    <span className={`block text-xs font-bold leading-[1.25] ${entry.type === 'off' ? 'text-orange-500' : 'text-hs-blue'}`}>
+                      {REQUEST_LABEL[entry.type]}
                     </span>
-                  )}
-                </div>
-              )}
-            </button>
-          )
-        })}
+                    {entry.type === 'custom' && entry.start_time && entry.end_time && (
+                      <span className="block text-xs font-medium text-hs-blue/60 leading-[1.25] mt-[2px] whitespace-nowrap overflow-hidden">
+                        {fmtTimeRange(entry.start_time, entry.end_time)}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
       </div>
 
       {/* ─── 件数 ─── */}
