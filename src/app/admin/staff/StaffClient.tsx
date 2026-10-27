@@ -7,6 +7,7 @@ import {
   inviteStaff,
   extendDeadline,
   setStaffActive,
+  setIsStaff,
   updateRole,
   fetchStaffList,
   type StaffListItem,
@@ -107,6 +108,19 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
       const result = await extendDeadline(staffId, null)
       if (result.error) { toast.error(result.error); return }
       toast.success(`${name}さんの延長を取り消しました`)
+      refresh()
+    })
+  }
+
+  // ─── is_staff トグル（管理者がシフトに入るか）─────────────────
+  const handleToggleIsStaff = (member: StaffListItem) => {
+    const next = !member.isStaff
+    startTransition(async () => {
+      const result = await setIsStaff(member.id, next)
+      if (result.error) { toast.error(result.error); return }
+      toast.success(next
+        ? `${member.fullName} をシフト対象に設定しました`
+        : `${member.fullName} をシフト対象から外しました`)
       refresh()
     })
   }
@@ -409,6 +423,19 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                   <td className="px-4 py-3 text-right">
                     {member.id !== currentUserId && (
                       <div className="flex items-center justify-end gap-2">
+                        {/* 管理者のみ：シフトに入るトグル */}
+                        {member.role === 'admin' && (
+                          <label className="flex items-center gap-1 cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={member.isStaff}
+                              disabled={isPending}
+                              onChange={() => handleToggleIsStaff(member)}
+                              className="rounded border-gray-300 w-3.5 h-3.5"
+                            />
+                            <span>シフト入る</span>
+                          </label>
+                        )}
                         <button
                           onClick={() => handleRoleToggle(member)}
                           disabled={isPending}

@@ -17,6 +17,7 @@ export interface StaffListItem {
   email: string
   role: UserRole
   isActive: boolean
+  isStaff: boolean   // 管理者がシフトに入る場合 true。role=staff は常に true 扱い
   facilities: FacilityBadge[]
   submittedAt: string | null
   extendedUntil: string | null
@@ -34,7 +35,11 @@ export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?
     { data: sfs },
     { data: subs },
   ] = await Promise.all([
-    admin.from('profiles').select('id, full_name, email, role, is_active').order('full_name'),
+    admin.from('profiles')
+      .select('id, full_name, email, role, is_active, is_staff')
+      // role=staff は全員表示。role=admin は is_staff=true のみ表示
+      .or('role.eq.staff,is_staff.eq.true')
+      .order('full_name'),
     admin.from('staff_facilities').select('staff_id, facility_id, is_primary, facilities(name)'),
     admin.from('request_submissions')
       .select('staff_id, submitted_at, extended_until')
@@ -73,6 +78,7 @@ export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?
       email: p.email ?? '',
       role: p.role as UserRole,
       isActive: p.is_active,
+      isStaff: p.role === 'staff' || (p.is_staff ?? false),
       facilities: facs,
       submittedAt: sub?.submittedAt ?? null,
       extendedUntil: sub?.extendedUntil ?? null,
@@ -161,6 +167,21 @@ export async function setStaffActive(
     .update({ is_active: isActive })
     .eq('id', staffId)
 
+  if (error) return { error: error.message }
+  revalidatePath('/admin/staff')
+  return {}
+}
+
+// ─── is_staff の切り替え（管理者がシフトに入るか） ───────────────
+export async function setIsStaff(
+  staffId: string,
+  isStaff: boolean,
+): Promise<{ error?: string }> {
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('profiles')
+    .update({ is_staff: isStaff })
+    .eq('id', staffId)
   if (error) return { error: error.message }
   revalidatePath('/admin/staff')
   return {}
