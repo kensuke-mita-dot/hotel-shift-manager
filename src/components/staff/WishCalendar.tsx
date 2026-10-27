@@ -210,7 +210,7 @@ export function WishCalendar({
       <div className="grid grid-cols-7 border-b border-hs-border">
         {CALENDAR_CELLS.map((d, i) => {
           if (!d) {
-            return <div key={`pad-${i}`} className="border-r border-b border-hs-border" style={{ height: 64 }} />
+            return <div key={`pad-${i}`} className="border-r border-b border-hs-border min-h-[64px]" />
           }
           const ds = dateStr(d)
           const entry = local.get(ds)
@@ -223,19 +223,18 @@ export function WishCalendar({
               key={ds}
               onClick={() => handleDayClick(d)}
               disabled={isLocked}
-              className={`border-r border-b border-hs-border text-left p-1.5 overflow-hidden transition-colors active:opacity-70 ${bg}`}
-              style={{ height: 64 }}
+              className={`border-r border-b border-hs-border text-left p-1.5 min-h-[64px] transition-colors active:opacity-70 ${bg}`}
             >
-              <span className={`text-xs font-medium leading-none ${dayColor}`}>{d}</span>
+              <span className={`block text-xs font-medium leading-none ${dayColor}`}>{d}</span>
               {entry && (
-                <div className="mt-0.5">
-                  <span className={`text-xs font-bold leading-tight ${entry.type === 'off' ? 'text-orange-500' : 'text-hs-blue'}`}>
+                <div className="mt-[3px]">
+                  <span className={`block text-xs font-bold leading-none ${entry.type === 'off' ? 'text-orange-500' : 'text-hs-blue'}`}>
                     {REQUEST_LABEL[entry.type]}
                   </span>
                   {entry.type === 'custom' && entry.start_time && entry.end_time && (
-                    <div className="text-[11px] font-medium text-hs-blue leading-tight whitespace-nowrap overflow-hidden">
+                    <span className="block text-[11px] font-medium text-hs-blue leading-none mt-[2px] overflow-hidden whitespace-nowrap">
                       {fmtTimeRange(entry.start_time, entry.end_time)}
-                    </div>
+                    </span>
                   )}
                 </div>
               )}
