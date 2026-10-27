@@ -37,8 +37,6 @@ export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?
   ] = await Promise.all([
     admin.from('profiles')
       .select('id, full_name, email, role, is_active, is_staff')
-      // role=staff は全員表示。role=admin は is_staff=true のみ表示
-      .or('role.eq.staff,is_staff.eq.true')
       .order('full_name'),
     admin.from('staff_facilities').select('staff_id, facility_id, is_primary, facilities(name)'),
     admin.from('request_submissions')

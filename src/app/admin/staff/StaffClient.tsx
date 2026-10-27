@@ -50,6 +50,7 @@ interface Props {
 export function StaffClient({ initialStaff, currentUserId, facilities }: Props) {
   const [staff, setStaff] = useState(initialStaff)
   const [filterFacility, setFilterFacility] = useState<string>('all')
+  const [showAdmins, setShowAdmins] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -69,11 +70,18 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
     if (result.staff) setStaff(result.staff)
   }
 
-  const filtered = filterFacility === 'all'
+  const displayStaff = showAdmins
     ? staff
-    : staff.filter(s => s.facilities.some(f => f.facilityId === filterFacility))
+    : staff.filter(s => s.role === 'staff' || s.isStaff)
 
-  const unsubmittedCount = filtered.filter(s => s.isActive && !s.submittedAt).length
+  const filtered = filterFacility === 'all'
+    ? displayStaff
+    : displayStaff.filter(s => s.facilities.some(f => f.facilityId === filterFacility))
+
+  // 未提出カウントは role=staff または is_staff=true の人だけ
+  const unsubmittedCount = staff
+    .filter(s => s.isActive && !s.submittedAt && (s.role === 'staff' || s.isStaff))
+    .length
 
   // ─── 招待 ───────────────────────────────────────────────────────
   const handleInvite = async (e: React.FormEvent) => {
@@ -268,8 +276,8 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
           </form>
         )}
 
-        {/* ── 施設フィルター ── */}
-        <div className="flex flex-wrap gap-2">
+        {/* ── 施設フィルター + 管理者トグル ── */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setFilterFacility('all')}
             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
@@ -291,6 +299,17 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
               {f.id}
             </button>
           ))}
+          <div className="ml-auto">
+            <button
+              onClick={() => setShowAdmins(v => !v)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
+                ${showAdmins
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
+            >
+              管理者を表示
+            </button>
+          </div>
         </div>
 
         {/* ── スタッフ一覧 ── */}
