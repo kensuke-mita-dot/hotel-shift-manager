@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase-admin'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 
@@ -30,6 +31,21 @@ export async function loginAction(
     return { status: 'error', message: 'メールアドレスを入力してください' }
   }
 
+  // 招待済みアカウントのみ許可（新規登録は admin からの招待のみ）
+  const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (!profile) {
+    return {
+      status: 'error',
+      message: 'このメールアドレスは登録されていません。管理者にお問い合わせください。',
+    }
+  }
+
   const emailRedirectTo = `${await getOrigin()}/auth/callback`
 
   const supabase = createClient()
@@ -43,6 +59,7 @@ export async function loginAction(
 
   if (error) {
     console.error('[loginAction] OTP error:', error.message)
+    return { status: 'error', message: 'メールの送信に失敗しました。しばらくしてから再度お試しください。' }
   }
 
   return { status: 'sent', email }
