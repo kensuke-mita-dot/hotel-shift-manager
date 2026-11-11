@@ -3,12 +3,15 @@
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { UserPlus, Trash2, Loader2, ShieldCheck, User } from 'lucide-react'
+import { UserPlus, Trash2, Loader2, ShieldCheck, User, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { inviteStaff, updateRole, removeStaff } from '@/app/actions/staff'
-import type { StaffMember } from '@/app/actions/staff'
+import { Fragment } from 'react'
+import { inviteStaff, updateRole, removeStaff, updatePaySettings } from '@/app/actions/staff'
+import type { StaffMember, PaySettings } from '@/app/actions/staff'
+import { FACILITIES } from '@/types'
 import type { UserRole } from '@/types'
+import { yen } from '@/lib/utils'
 
 const AVATAR_COLORS = [
   '#9FE1CB','#B5D4F4','#F5C4B3','#CECBF6',
@@ -30,6 +33,20 @@ export function StaffClient({ initialStaff, currentUserId }: Props) {
   const [fullName,   setFullName]   = useState('')
   const [isPending,  startTransition] = useTransition()
   const [inviting,   setInviting]   = useState(false)
+  const [editingId,  setEditingId]  = useState<string | null>(null)
+
+  // ─── 施設・時給・交通費の保存 ───────────────────────────────
+  const handleSavePay = async (member: StaffMember, settings: PaySettings) => {
+    const result = await updatePaySettings(member.id, settings)
+    if (result.error) {
+      toast.error(`保存に失敗: ${result.error}`)
+      return false
+    }
+    setStaff(prev => prev.map(s => s.id === member.id ? { ...s, ...settings } : s))
+    toast.success(`${member.fullName} の設定を保存しました`)
+    setEditingId(null)
+    return true
+  }
 
   // ─── 招待 ───────────────────────────────────────────────────
   const handleInvite = async (e: React.FormEvent) => {
@@ -85,7 +102,7 @@ export function StaffClient({ initialStaff, currentUserId }: Props) {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
 
         {/* ヘッダー */}
         <div className="flex items-center justify-between mb-6">
@@ -149,13 +166,15 @@ export function StaffClient({ initialStaff, currentUserId }: Props) {
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">スタッフ</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">メール</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">ロール</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">施設・時給・交通費</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">登録日</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {staff.map(member => (
-                <tr key={member.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <Fragment key={member.id}>
+                <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <div
@@ -184,6 +203,26 @@ export function StaffClient({ initialStaff, currentUserId }: Props) {
                         : <><User className="w-3 h-3" />スタッフ</>}
                     </button>
                   </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => setEditingId(id => id === member.id ? null : member.id)}
+                      className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900"
+                      title="施設・時給・交通費を編集"
+                    >
+                      <span>{member.facility ?? '施設未設定'}</span>
+                      <span className="text-gray-300">·</span>
+                      <span className={member.hourlyWage === 0 ? 'text-amber-600' : ''}>
+                        {member.hourlyWage === 0 ? '時給未設定' : `${yen(member.hourlyWage)}/h`}
+                      </span>
+                      <span className="text-gray-300">·</span>
+                      <span>
+                        {member.transportAmount === 0
+                          ? '交通費なし'
+                          : `${member.transportType === 'monthly' ? '月' : '1出勤'}${yen(member.transportAmount)}`}
+                      </span>
+                      <Pencil className="w-3 h-3 text-gray-400" />
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">
                     {format(new Date(member.createdAt), 'yyyy/MM/dd', { locale: ja })}
                   </td>
@@ -200,10 +239,22 @@ export function StaffClient({ initialStaff, currentUserId }: Props) {
                     )}
                   </td>
                 </tr>
+                {editingId === member.id && (
+                  <tr className="border-b border-gray-100 bg-gray-50/60">
+                    <td colSpan={6} className="px-4 py-3">
+                      <PayEditor
+                        member={member}
+                        onCancel={() => setEditingId(null)}
+                        onSave={settings => handleSavePay(member, settings)}
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
               {staff.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">
                     スタッフが登録されていません
                   </td>
                 </tr>
@@ -214,5 +265,76 @@ export function StaffClient({ initialStaff, currentUserId }: Props) {
 
       </div>
     </div>
+  )
+}
+
+// ─── 施設・時給・交通費の編集フォーム ─────────────────────────
+function PayEditor({
+  member, onCancel, onSave,
+}: {
+  member:   StaffMember
+  onCancel: () => void
+  onSave:   (s: PaySettings) => Promise<boolean>
+}) {
+  const [facility,  setFacility]  = useState(member.facility ?? '')
+  const [wage,      setWage]      = useState(member.hourlyWage ? String(member.hourlyWage) : '')
+  const [tType,     setTType]     = useState(member.transportType)
+  const [tAmount,   setTAmount]   = useState(member.transportAmount ? String(member.transportAmount) : '')
+  const [saving,    setSaving]    = useState(false)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    await onSave({
+      facility:        facility || null,
+      hourlyWage:      Number(wage || 0),
+      transportType:   tType,
+      transportAmount: Number(tAmount || 0),
+    })
+    setSaving(false)
+  }
+
+  const input = 'border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900'
+
+  return (
+    <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">施設</label>
+        <select value={facility} onChange={e => setFacility(e.target.value)} className={input}>
+          <option value="">未設定</option>
+          {FACILITIES.map(f => (
+            <option key={f.code} value={f.code}>{f.code}（{f.name}）</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">時給（円）</label>
+        <input
+          type="number" min={0} step={1} inputMode="numeric"
+          value={wage} onChange={e => setWage(e.target.value)}
+          placeholder="1200" className={`${input} w-28`}
+        />
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">交通費</label>
+        <div className="flex gap-2">
+          <select value={tType} onChange={e => setTType(e.target.value as PaySettings['transportType'])} className={input}>
+            <option value="per_day">1出勤あたり</option>
+            <option value="monthly">月額</option>
+          </select>
+          <input
+            type="number" min={0} step={1} inputMode="numeric"
+            value={tAmount} onChange={e => setTAmount(e.target.value)}
+            placeholder="0" className={`${input} w-28`}
+          />
+        </div>
+      </div>
+      <div className="flex gap-2 ml-auto">
+        <Button type="button" variant="outline" onClick={onCancel}>キャンセル</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中...</> : '保存'}
+        </Button>
+      </div>
+    </form>
   )
 }

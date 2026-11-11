@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { requireAdmin } from '@/lib/auth-guard'
 import type { ShiftSlot, WishType } from '@/types'
 
 interface DraftShift {
@@ -21,6 +22,10 @@ export async function generateDraft(
   year: number,
   month: number,
 ): Promise<GenerateResult> {
+  // service role で月全体を削除するため管理者限定
+  const guard = await requireAdmin()
+  if ('error' in guard) return { generated: 0, warnings: [], error: guard.error }
+
   const supabase = createClient()
   const admin    = createAdminClient()
 

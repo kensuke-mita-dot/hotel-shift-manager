@@ -10,6 +10,9 @@ import { fetchMonthData } from '@/app/actions/shifts'
 import { generateDraft } from '@/app/actions/aiDraft'
 import type { DayAssignment } from '@/types'
 
+// AI下書きは初期運用では使わない（手動で組む）。再開するときは true に
+const AI_DRAFT_ENABLED = false
+
 interface Props {
   initialYear:        number
   initialMonth:       number
@@ -83,6 +86,7 @@ export function MonthlyClient({ initialYear, initialMonth, initialAssignments }:
 
           <div className="flex items-center gap-3">
             {/* AIドラフト生成ボタン */}
+            {AI_DRAFT_ENABLED && (
             <Button
               variant="outline"
               onClick={handleGenerate}
@@ -93,6 +97,7 @@ export function MonthlyClient({ initialYear, initialMonth, initialAssignments }:
                 ? <><Loader2 className="w-4 h-4 animate-spin" />生成中...</>
                 : <><Sparkles className="w-4 h-4" />AIでシフトを生成</>}
             </Button>
+            )}
 
             {/* 月ナビ */}
             <div className="flex items-center gap-1">
