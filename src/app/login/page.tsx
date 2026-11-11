@@ -36,22 +36,26 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <label
-                htmlFor="email"
+                htmlFor="identifier"
                 className="block text-sm font-medium text-gray-700"
               >
-                メールアドレス
+                ログインID
               </label>
               <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
+                id="identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
                 required
-                placeholder="you@example.com"
+                placeholder="例：BHJ01"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
                   outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10
                   transition-colors placeholder:text-gray-400"
               />
+              <p className="text-xs text-gray-400">管理者はメールアドレスを入力</p>
             </div>
 
             <div className="space-y-1.5">
@@ -59,7 +63,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700"
               >
-                パスワード
+                PIN（6桁）
               </label>
               <input
                 id="password"
@@ -67,11 +71,12 @@ export default function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 required
-                placeholder="••••••••"
+                placeholder="••••••"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
                   outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10
                   transition-colors placeholder:text-gray-400"
               />
+              <p className="text-xs text-gray-400">管理者はパスワードを入力</p>
             </div>
 
             <SubmitButton />
@@ -79,7 +84,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          アカウントをお持ちでない方は管理者にお問い合わせください
+          ログインIDやPINがわからないときは、管理者に再発行を依頼してください
         </p>
       </div>
     </div>

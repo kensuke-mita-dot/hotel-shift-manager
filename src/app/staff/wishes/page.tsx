@@ -3,15 +3,16 @@ import { createClient } from '@/lib/supabase-server'
 import { fetchWishes } from '@/app/actions/wishes'
 import { WishInputGrid } from '@/components/staff/WishInputGrid'
 import type { WishType } from '@/types'
+import { todayJST } from '@/lib/utils'
 
 export default async function WishesPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   // 来月を対象月にする
-  const now   = new Date()
-  const year  = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear()
-  const month = now.getMonth() === 11 ? 1 : now.getMonth() + 2
+  const [ty, tm] = todayJST().split('-').map(Number)
+  const year  = tm === 12 ? ty + 1 : ty
+  const month = tm === 12 ? 1 : tm + 1
 
   if (!user) {
     redirect('/login')

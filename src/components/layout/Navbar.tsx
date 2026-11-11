@@ -24,7 +24,9 @@ const ADMIN_LINKS = [
 ]
 
 const STAFF_LINKS = [
+  { href: '/staff/shifts', label: 'シフト' },
   { href: '/staff/wishes', label: '希望入力' },
+  { href: '/staff/pin',    label: 'PIN変更' },
 ]
 
 export async function Navbar() {
@@ -49,7 +51,7 @@ export async function Navbar() {
 
         {/* ロゴ */}
         <Link
-          href={role === 'admin' ? '/admin/daily' : '/staff/wishes'}
+          href={role === 'admin' ? '/admin/daily' : '/staff/shifts'}
           className="flex items-center gap-2 flex-shrink-0"
         >
           <div className="w-7 h-7 bg-gray-900 rounded-lg flex items-center justify-center">
