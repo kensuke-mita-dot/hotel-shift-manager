@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { todayJST } from '@/lib/utils'
 import { fetchDayData } from '@/app/actions/shifts'
 import { DailyAdjustClient } from './DailyAdjustClient'
 
@@ -7,8 +7,8 @@ export default async function DailyAdjustPage({
 }: {
   searchParams: { date?: string }
 }) {
-  const today   = format(new Date(), 'yyyy-MM-dd')
-  const dateStr = searchParams.date ?? today
+  const today   = todayJST()
+  const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date ?? '') ? searchParams.date! : today
 
   const { pool, assignment, error } = await fetchDayData(dateStr)
 

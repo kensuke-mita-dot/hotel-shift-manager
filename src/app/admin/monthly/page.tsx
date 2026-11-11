@@ -1,14 +1,17 @@
 import { fetchMonthData } from '@/app/actions/shifts'
 import { MonthlyClient } from './MonthlyClient'
+import { todayJST } from '@/lib/utils'
 
 export default async function MonthlyPage({
   searchParams,
 }: {
   searchParams: { year?: string; month?: string }
 }) {
-  const now   = new Date()
-  const year  = searchParams.year  ? parseInt(searchParams.year)  : now.getFullYear()
-  const month = searchParams.month ? parseInt(searchParams.month) : now.getMonth() + 1
+  const [ty, tm] = todayJST().split('-').map(Number)
+  const qy = parseInt(searchParams.year  ?? '')
+  const qm = parseInt(searchParams.month ?? '')
+  const year  = Number.isFinite(qy) ? qy : ty
+  const month = Number.isFinite(qm) && qm >= 1 && qm <= 12 ? qm : tm
 
   const { assignments, error } = await fetchMonthData(year, month)
 

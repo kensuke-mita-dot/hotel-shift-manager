@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
     if (user) {
       // ログイン済みならロールに応じてリダイレクト
       const role = await getRole(supabase, user.id)
-      const dest = role === 'admin' ? '/admin/daily' : '/staff/wishes'
+      const dest = role === 'admin' ? '/admin/daily' : '/staff/shifts'
       return NextResponse.redirect(new URL(dest, request.url))
     }
     return supabaseResponse
@@ -73,7 +73,19 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/admin')) {
     const role = await getRole(supabase, user.id)
     if (role !== 'admin') {
-      return NextResponse.redirect(new URL('/staff/wishes', request.url))
+      return NextResponse.redirect(new URL('/staff/shifts', request.url))
+    }
+  }
+
+  // ── 初期PIN・再発行PINのままならPIN変更を先に求める ───────────────
+  if (pathname.startsWith('/staff') && pathname !== '/staff/pin') {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('must_change_pin')
+      .eq('id', user.id)
+      .single()
+    if (!error && data?.must_change_pin) {
+      return NextResponse.redirect(new URL('/staff/pin', request.url))
     }
   }
 

@@ -81,13 +81,13 @@ export function DailyAdjustClient({ initialDate, initialPool, initialAssignment 
 
   // ─── 保存 ───────────────────────────────────────────────────
   const handleSave = async () => {
+    // 夜勤明け朝勤NGは保存不可。欠員は途中保存できるよう警告のみ
     const validation = validateDayAssignment(assignment)
-    if (!validation.isValid) {
-      const msgs = [
-        validation.hasEmptySlot && '空きスロットがあります',
-        ...validation.ngPatterns.map(p => `${p.staffName}：夜勤明け朝勤NG`),
-      ].filter(Boolean).join(' / ')
-      toast.warning(msgs, { duration: 5000 })
+    if (validation.ngPatterns.length > 0) {
+      toast.warning(
+        validation.ngPatterns.map(p => `${p.staffName}：夜勤明け朝勤NG`).join(' / '),
+        { duration: 5000 },
+      )
       return
     }
 
@@ -100,6 +100,9 @@ export function DailyAdjustClient({ initialDate, initialPool, initialAssignment 
       return
     }
     toast.success(`${format(currentDate, 'M月d日', { locale: ja })}のシフトを保存しました`)
+    if (validation.hasEmptySlot) {
+      toast.warning('欠員のスロットがあります（各スロット最低1名）', { duration: 5000 })
+    }
   }
 
   const validation = validateDayAssignment(assignment)
@@ -193,7 +196,7 @@ export function DailyAdjustClient({ initialDate, initialPool, initialAssignment 
             <Button
               className="w-full"
               onClick={handleSave}
-              disabled={!validation.isValid || isSaving || isLoading}
+              disabled={validation.ngPatterns.length > 0 || isSaving || isLoading}
             >
               {isSaving ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中...</>

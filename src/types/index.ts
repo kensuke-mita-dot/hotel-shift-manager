@@ -18,6 +18,31 @@ export const SLOT_META: Record<ShiftSlot, {
   night:   { label: '夜勤', time: '22:00〜08:00', color: '#534AB7', badge: 'bg-purple-100 text-purple-800' },
 }
 
+// ─── 施設 ─────────────────────────────────────────────────
+export const FACILITIES = [
+  { code: 'BHJ',   name: 'BOOK HOTEL 神保町' },
+  { code: 'BHKK',  name: 'BOOK HOTEL 京都九条' },
+  { code: 'MAHT',  name: 'MANGA ART HOTEL TOKYO' },
+  { code: 'MAHB',  name: 'MANGA ART HOTEL BAKUROCHO' },
+  { code: 'MAHNM', name: 'MANGA ART HOTEL NAGOYA MARUNOUCHI' },
+] as const
+
+export type TransportType = 'per_day' | 'monthly'
+
+/**
+ * 人件費計算用のスロット別労働時間。
+ * 休憩1時間を差し引いた実働時間と、そのうち深夜（22:00〜05:00）にかかる時間。
+ * 夜勤の休憩は深夜帯に取る前提。運用に合わせてここを変えれば全画面に反映される。
+ */
+export const SLOT_HOURS: Record<ShiftSlot, { paid: number; lateNight: number }> = {
+  morning: { paid: 7, lateNight: 0 },  // 08:00〜16:00（休憩1h）
+  evening: { paid: 7, lateNight: 0 },  // 14:00〜22:00（休憩1h）
+  night:   { paid: 9, lateNight: 6 },  // 22:00〜08:00（休憩1h、深夜7h−休憩1h）
+}
+
+/** 深夜割増率（労基法の下限 25%） */
+export const LATE_NIGHT_PREMIUM = 0.25
+
 export const WISH_LABEL: Record<WishType, string> = {
   morning: '朝希望',
   evening: '夕希望',
