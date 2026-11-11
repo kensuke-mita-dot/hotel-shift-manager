@@ -14,3 +14,26 @@ export function todayJST(): string {
 export function yen(n: number): string {
   return '¥' + Math.round(n).toLocaleString('ja-JP')
 }
+
+/** 'YYYY-MM-DD' に日数を足す（タイムゾーンの影響を受けない） */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d + days))
+  return t.toISOString().slice(0, 10)
+}
+
+/** 'YYYY-MM-DD' の曜日（0=日） */
+export function weekday(date: string): number {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
+export const WEEK_JA = ['日', '月', '火', '水', '木', '金', '土']
+
+/** 'YYYY-MM' の月初と月末 */
+export function monthRange(month: string): { from: string; to: string; days: number } {
+  const [y, m] = month.split('-').map(Number)
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(days)}`, days }
+}

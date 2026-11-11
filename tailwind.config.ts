@@ -19,6 +19,7 @@ const config: Config = {
     },
     extend: {
       colors: {
+        // ── shadcn/ui のデザインシステム変数（既存）──
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -52,11 +53,54 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // ── ホテルシフト デザイントークン ──
+        hs: {
+          // メイン（選択中・主ボタン）
+          blue:        "#2b8fe0",
+          "blue-hover": "#1f72b8",
+          "blue-dark":  "#195d96",
+          "blue-bg":    "#eaf4fd",
+          "blue-bg2":   "#d6eafb",
+          "blue-border":"#a9d2f5",
+          // 文字
+          text:         "#333333",
+          "text-sub":   "#5f646b",
+          "text-light":  "#80858c",
+          "text-lighter":"#9a9ea5",
+          // 罫線・背景
+          border:       "#e3e5e8",
+          "input-border":"#d5d8dc",
+          surface:      "#ffffff",
+          "gray-light":  "#f0f1f3",
+          "gray-lighter":"#f7f8f9",
+          // 警告（欠員・NG）
+          danger:       "#e5484d",
+          "danger-bg":  "#fdeeee",
+          "danger-border":"#f4b4b6",
+          // 注意（休み・兼任先・延長）
+          warn:         "#e0661a",
+          "warn-bg":    "#fdf0e6",
+          // 配置済みチップ
+          chip:         "#5a5f66",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // ホテルシフト固有
+        chip: "4px",
+        card: "8px",
+        btn:  "6px",
+      },
+      fontFamily: {
+        sans: ["'Hiragino Sans'", "'Hiragino Kaku Gothic ProN'", "'Noto Sans JP'", "sans-serif"],
+      },
+      minHeight: {
+        tap: "44px",
+      },
+      minWidth: {
+        tap: "44px",
       },
       keyframes: {
         "accordion-down": {

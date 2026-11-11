@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<script src="_ds/industry-a66ce12f-4b36-4199-84e1-2cb02b309fa5/_ds_bundle.js"></script>
+<script src="shift-data.js"></script>
+<style>a{color:#1f72b8}a:hover{color:#195d96}</style>
+</helmet>
+<div ref="{{ rootRef }}" style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;background:#ffffff;color:#333333;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-size:14px;line-height:1.45">
+
+  <sc-if value="{{ isPhone }}" hint-placeholder-val="{{ true }}">
+    <div style="height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:500">
+      <span>9:41</span><span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;letter-spacing:.06em">5G ▮▮▮</span>
+    </div>
+  </sc-if>
+
+  <div style="flex:none;display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid #e3e5e8">
+    <div style="display:flex;flex-direction:column;line-height:1.1">
+      <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:15px;letter-spacing:.12em">HOTEL SHIFT</span>
+      <span style="font-size:10px;color:#80858c">{{ userLabel }}</span>
+    </div>
+    <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:4px;margin-left:16px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.onClick }}" style="border:0;background:transparent;cursor:pointer;padding:8px 12px;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:15px;color:{{ t.fg }};box-shadow:{{ t.barDesk }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+    </sc-if>
+    <div style="display:inline-flex;border:1px solid #d5d8dc;border-radius:6px;overflow:hidden;margin-left:auto">
+      <button onClick="{{ setStaff }}" style="border:0;cursor:pointer;padding:6px 10px;font:inherit;font-size:12px;background:{{ staffBg }};color:{{ staffFg }}">スタッフ表示</button>
+      <button onClick="{{ setAdmin }}" style="border:0;border-left:1px solid #e3e5e8;cursor:pointer;padding:6px 10px;font:inherit;font-size:12px;background:{{ adminBg }};color:{{ adminFg }}">管理者表示</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ isPhone }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:none;display:flex;border-bottom:1px solid #e3e5e8">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <button onClick="{{ t.onClick }}" style="flex:1;height:44px;border:0;background:transparent;cursor:pointer;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:14px;color:{{ t.fg }};box-shadow:{{ t.barDesk }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showFacTabs }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:none;display:flex;gap:6px;overflow-x:auto;padding:8px 16px;border-bottom:1px solid #e3e5e8">
+      <sc-for list="{{ facTabs }}" as="f" hint-placeholder-count="6">
+        <button onClick="{{ f.onClick }}" style="flex:none;display:flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid {{ f.bd }};background:{{ f.bg }};color:{{ f.fg }};cursor:pointer;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:13px;border-radius:6px">{{ f.label }}<sc-if value="{{ f.hasN }}" hint-placeholder-val="{{ false }}"><span title="欠員＋NG" style="min-width:18px;height:18px;padding:0 4px;display:flex;align-items:center;justify-content:center;background:#e5484d;color:#fff;font-size:11px;letter-spacing:0">{{ f.n }}</span></sc-if></button>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <div style="flex:1;min-height:0;overflow:auto">
+    <sc-if value="{{ loading }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:40px;text-align:center;color:#80858c;font-size:13px">読み込み中…</div>
+    </sc-if>
+
+    <!-- スタッフ：希望入力 -->
+    <sc-if value="{{ isReq }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;max-width:560px;margin:0 auto">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px">
+          <div>
+            <div style="font-size:12px;color:#80858c;margin-bottom:2px">希望入力 · {{ reqKicker }}</div>
+            <h3 style="margin:0;font-size:20px;font-weight:700">2026年11月</h3>
+          </div>
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:{{ subBg }};color:{{ subFg }}">{{ subText }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px">
+          <sc-for list="{{ dowHead }}" as="w" hint-placeholder-count="7">
+            <div style="text-align:center;font-size:11px;color:{{ w.fg }}">{{ w.t }}</div>
+          </sc-for>
+          <sc-for list="{{ calCells }}" as="c" hint-placeholder-count="30">
+            <button onClick="{{ c.onClick }}" style="visibility:{{ c.vis }};min-height:58px;border-radius:6px;padding:4px 3px;border:1px solid {{ c.bd }};background:{{ c.bg }};display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;font:inherit;color:inherit">
+              <span style="align-self:flex-start;font-size:10px;color:{{ c.dayFg }}">{{ c.d }}</span>
+              <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:17px;line-height:1;color:{{ c.fg }}">{{ c.label }}</span>
+              <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-size:10px;color:#1f72b8">{{ c.time }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <sc-for list="{{ reqCounts }}" as="k" hint-placeholder-count="5">
+            <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:#f0f1f3;color:#5f646b">{{ k.label }} {{ k.n }}</span>
+          </sc-for>
+        </div>
+        <sc-if value="{{ reqLocked }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:12px;font-weight:500;padding:8px 10px;border:1px solid #f4b4b6;border-radius:6px;background:#fdeeee;color:#c62f35">{{ reqLockText }}</div>
+        </sc-if>
+        <p style="margin:0;font-size:12px;color:#80858c">日付をタップして「朝／夕／夜／休／時間指定」を選びます。提出後も期限までは変更できます。</p>
+        <button onClick="{{ onSubmit }}" disabled="{{ reqLocked }}" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#2b8fe0;color:#ffffff;border:1px solid #2b8fe0;min-height:46px;font-size:16px" style-hover="background:#1f72b8;border-color:#1f72b8">{{ submitLabel }}</button>
+      </div>
+    </sc-if>
+
+    <!-- スタッフ：確定シフト / 管理者：月間 -->
+    <sc-if value="{{ showMatrix }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;color:#80858c;margin-bottom:2px">{{ mxKicker }}</div>
+            <h3 style="margin:0;font-size:20px;font-weight:700">2026年11月</h3>
+          </div>
+          <sc-if value="{{ isMonth }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ onConfirmAll }}" disabled="{{ noDrafts }}" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#2b8fe0;color:#ffffff;border:1px solid #2b8fe0" style-hover="background:#1f72b8;border-color:#1f72b8">{{ confirmLabel }}</button>
+          </sc-if>
+          <sc-if value="{{ isView }}" hint-placeholder-val="{{ false }}">
+            <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:#eaf4fd;color:#1f72b8">{{ mySummary }}</span>
+          </sc-if>
+        </div>
+        <sc-if value="{{ viewNotice }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:12px;padding:8px 10px;border:1px dashed #2b8fe0;color:#195d96">{{ viewNoticeText }}</div>
+        </sc-if>
+        <div style="overflow:auto;border:1px solid #e3e5e8;max-height:{{ mxMaxH }}">
+          <div style="width:max-content;font-size:11px">
+            <div style="display:flex;position:sticky;top:0;z-index:2;background:#ffffff">
+              <div style="position:sticky;left:0;z-index:3;width:76px;flex:none;padding:6px 8px;background:#ffffff;border-right:1px solid #e3e5e8;border-bottom:1px solid #e3e5e8;font-size:10px;color:#80858c">スタッフ</div>
+              <sc-for list="{{ mxDays }}" as="d" hint-placeholder-count="30">
+                <button onClick="{{ d.onClick }}" title="{{ d.title }}" style="width:44px;flex:none;border:0;border-bottom:1px solid #e3e5e8;border-right:1px solid #eef0f2;background:{{ d.bg }};cursor:{{ d.cursor }};padding:4px 0;font:inherit;display:flex;flex-direction:column;align-items:center;line-height:1.15;color:{{ d.fg }}">
+                  <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:13px">{{ d.d }}</span><span style="font-size:9px">{{ d.w }}</span>
+                </button>
+              </sc-for>
+            </div>
+            <sc-for list="{{ mxRows }}" as="row" hint-placeholder-count="7">
+              <div style="display:flex">
+                <div onClick="{{ row.onClick }}" style="cursor:{{ row.cursor }};position:sticky;left:0;z-index:1;width:76px;flex:none;padding:0 8px;height:34px;display:flex;align-items:center;background:{{ row.bg }};border-right:1px solid #e3e5e8;border-bottom:1px solid #e9ebee;font-size:12px;font-weight:{{ row.fw }};color:#2e9e4f;white-space:nowrap">{{ row.name }}</div>
+                <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="30">
+                  <div title="{{ c.title }}" style="width:44px;height:34px;flex:none;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-size:12px;background:{{ c.bg }};color:{{ c.fg }};box-shadow:{{ c.sh }};border-right:1px solid #eef0f2;border-bottom:1px solid #e9ebee"><span style="min-width:26px;padding:3px 3px;border-radius:4px;text-align:center;font-weight:600;font-size:11px;line-height:1.2;background:{{ c.chip }};color:{{ c.fg }}">{{ c.t }}</span></div>
+                </sc-for>
+              </div>
+            </sc-for>
+            <sc-for list="{{ mxCounts }}" as="cr" hint-placeholder-count="0">
+              <div style="display:flex">
+                <div style="position:sticky;left:0;z-index:1;width:76px;flex:none;padding:0 8px;height:26px;display:flex;align-items:center;background:#f0f1f3;border-right:1px solid #e3e5e8;border-top:{{ cr.bt }};font-size:11px">{{ cr.label }}</div>
+                <sc-for list="{{ cr.cells }}" as="c" hint-placeholder-count="30">
+                  <div style="width:44px;height:26px;flex:none;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:12px;background:{{ c.bg }};color:{{ c.fg }};border-top:{{ cr.bt }};border-right:1px solid #eef0f2">{{ c.t }}</div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:#80858c">
+          <sc-for list="{{ mxLegend }}" as="l" hint-placeholder-count="3">
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;background:{{ l.bg }};box-shadow:{{ l.sh }};border:1px solid #e3e5e8"></span>{{ l.t }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- 管理者：日次調整 -->
+    <sc-if value="{{ isDaily }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:{{ pad }};display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onClick="{{ onPrev }}" disabled="{{ prevDis }}" aria-label="前日" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#ffffff;color:#333333;border:1px solid #d5d8dc;padding:0;width:36px;width:44px;height:44px" style-hover="background:#f5f6f7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m15 18-6-6 6-6"></path></svg></button>
+          <div style="flex:1;text-align:center;line-height:1.2">
+            <div style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:22px">{{ dayTitle }}</div>
+            <div style="font-size:11px;color:{{ dayStatFg }}">{{ dayStat }}</div>
+          </div>
+          <button onClick="{{ onNext }}" disabled="{{ nextDis }}" aria-label="翌日" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#ffffff;color:#333333;border:1px solid #d5d8dc;padding:0;width:36px;width:44px;height:44px" style-hover="background:#f5f6f7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m9 18 6-6-6-6"></path></svg></button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button disabled="{{ true }}" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#ffffff;color:#333333;border:1px solid #d5d8dc;gap:8px" style-hover="background:#f5f6f7"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg>AI下書き作成<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:#f0f1f3;color:#5f646b;padding:0 6px">近日公開</span></button>
+          <span style="font-size:11px;color:#80858c">{{ dragHint }}</span>
+        </div>
+
+        <sc-if value="{{ isDailyA }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:{{ dailyCols }};gap:20px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <sc-for list="{{ slots }}" as="sl" hint-placeholder-count="3">
+                <div data-drop="{{ sl.key }}" style="border:1px solid #e3e5e8;border-radius:8px;position:relative;padding:10px 12px 12px;border-color:{{ sl.bd }};background:{{ sl.bg }};display:flex;flex-direction:column;gap:8px">
+                  
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:22px;line-height:1">{{ sl.label }}</span>
+                    <span style="font-size:12px;color:#80858c">{{ sl.time }}</span>
+                    <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+                      <span style="font-size:10px;color:{{ sl.minFg }}">{{ sl.minNote }}</span>
+                      <span style="display:inline-flex;align-items:center;border:1px solid #d5d8dc;border-radius:6px;overflow:hidden;background:#ffffff">
+                        <button onClick="{{ sl.minDec }}" aria-label="最低人数を減らす" style="width:28px;height:28px;border:0;background:transparent;cursor:pointer;font-size:14px;color:#333333" style-hover="background:#f5f6f7">−</button>
+                        <span style="padding:0 2px;font-weight:600;font-size:14px;color:{{ sl.countFg }}">{{ sl.countText }}</span>
+                        <button onClick="{{ sl.minInc }}" aria-label="最低人数を増やす" style="width:28px;height:28px;border:0;background:transparent;cursor:pointer;font-size:14px;color:#333333" style-hover="background:#f5f6f7">＋</button>
+                      </span>
+                    </span>
+                  </div>
+                  <sc-if value="{{ sl.short }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:12px;font-weight:500;color:#e5484d">{{ sl.gapText }}</div>
+                  </sc-if>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <sc-for list="{{ sl.members }}" as="m" hint-placeholder-count="2">
+                      <div onPointerDown="{{ m.onDown }}" title="{{ m.title }}" style="touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;display:flex;align-items:center;gap:6px;padding:0 10px;min-height:44px;border-radius:4px;color:{{ m.fg }};border:1px solid {{ m.bd }};background:{{ m.bg }};opacity:{{ m.op }}">
+                        <span style="font-weight:500">{{ m.name }}</span>
+                        <sc-if value="{{ m.hasTime }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:13px;color:#d6eafb">{{ m.time }}</span></sc-if>
+                        <sc-if value="{{ m.partial }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:#ffffff;color:#5f646b;padding:0 5px;font-size:10px">一部</span></sc-if>
+                        <sc-if value="{{ m.ng }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;font-weight:600;color:#e5484d;background:#ffffff;border-radius:3px;padding:1px 5px">NG {{ m.issueText }}</span></sc-if>
+                        <sc-if value="{{ m.draft }}" hint-placeholder-val="{{ false }}"><span title="未確定" style="width:6px;height:6px;background:#2b8fe0"></span></sc-if>
+                      </div>
+                    </sc-for>
+                    <button onClick="{{ sl.onAdd }}" style="min-height:44px;padding:0 12px;border:1px dashed #b8bcc2;background:transparent;cursor:pointer;font:inherit;font-size:12px;color:#5f646b">＋ 追加</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ false }}">
+              <div data-drop="tray" style="border:1px solid {{ trayBd }};background:{{ trayBg }};display:flex;flex-direction:column;position:sticky;top:0">
+                <div style="padding:10px 12px;border-bottom:1px solid #e3e5e8;display:flex;align-items:baseline;justify-content:space-between">
+                  <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:16px">スタッフ一覧</span>
+                  <span style="font-size:11px;color:#80858c">未配置 {{ unCount }}名</span>
+                </div>
+                <sc-for list="{{ tray }}" as="t" hint-placeholder-count="7">
+                  <div onPointerDown="{{ t.onDown }}" style="touch-action:none;user-select:none;cursor:grab;display:flex;align-items:center;gap:8px;padding:8px 12px;min-height:44px;border-bottom:1px solid #e9ebee;opacity:{{ t.op }}">
+                    <span style="font-weight:500;flex:1">{{ t.name }}</span>
+                    <span style="font-size:10px;color:#80858c">希望</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:{{ t.badgeBg }};color:{{ t.badgeFg }};padding:1px 7px">{{ t.badge }}</span>
+                    <span style="min-width:52px;white-space:nowrap;text-align:right;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-size:13px;color:{{ t.assignFg }}">{{ t.assigned }}</span>
+                  </div>
+                </sc-for>
+                <div style="padding:8px 12px;font-size:11px;color:#80858c">ここにドロップで配置を外す／行クリックでシフトを選択</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDailyB }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:{{ slotCols }};gap:8px;position:sticky;top:0;z-index:2;background:#ffffff;padding:4px 0 6px">
+            <sc-for list="{{ slots }}" as="sl" hint-placeholder-count="3">
+              <div data-drop="{{ sl.key }}" style="border:1px solid #e3e5e8;border-radius:8px;position:relative;padding:8px;border-color:{{ sl.bd }};background:{{ sl.bg }};display:flex;flex-direction:column;gap:2px;min-height:76px">
+                
+                <div style="display:flex;align-items:baseline;justify-content:space-between">
+                  <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:20px;line-height:1">{{ sl.label }}</span>
+                  <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:14px;color:{{ sl.countFg }}">{{ sl.countText }}</span>
+                </div>
+                <span style="font-size:10px;color:#80858c">{{ sl.time }}</span>
+                <span style="font-size:11px;line-height:1.3;color:{{ sl.namesFg }}">{{ sl.names }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ people }}" as="p" hint-placeholder-count="7">
+              <div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-bottom:1px solid #e3e5e8;background:{{ p.bg }}">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span onPointerDown="{{ p.onDown }}" style="touch-action:none;user-select:none;cursor:grab;font-weight:500;padding:4px 8px;border:1px solid #e3e5e8;border-radius:6px;background:#ffffff">⋮⋮ {{ p.name }}</span>
+                  <span style="font-size:10px;color:#80858c">希望</span>
+                  <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:{{ p.badgeBg }};color:{{ p.badgeFg }};padding:1px 7px">{{ p.badge }}</span>
+                  <sc-if value="{{ p.mismatch }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;color:#1f72b8">希望と異なる</span></sc-if>
+                  <sc-if value="{{ p.hasElse }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;color:#e0661a">{{ p.elseText }}</span></sc-if>
+                  <sc-if value="{{ p.ng }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;font-size:10px;font-weight:500;color:#fff;background:#e5484d;padding:1px 5px">NG {{ p.issueText }}</span></sc-if>
+                </div>
+                <div style="display:grid;grid-template-columns:{{ p.optCols }};border:1px solid #e3e5e8">
+                  <sc-for list="{{ p.opts }}" as="o" hint-placeholder-count="5">
+                    <button onClick="{{ o.onClick }}" style="min-height:44px;border:0;border-left:{{ o.bl }};background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:14px;line-height:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center">{{ o.label }}<span style="font-size:9px;font-weight:400">{{ o.sub }}</span></button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- 管理者：全施設 日次一覧 -->
+    <sc-if value="{{ isAllDaily }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:{{ pad }};display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onClick="{{ onPrev }}" disabled="{{ prevDis }}" aria-label="前日" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#ffffff;color:#333333;border:1px solid #d5d8dc;padding:0;width:36px;width:44px;height:44px" style-hover="background:#f5f6f7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m15 18-6-6 6-6"></path></svg></button>
+          <div style="flex:1;text-align:center;line-height:1.2">
+            <div style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:22px">{{ dayTitle }}</div>
+            <div style="font-size:11px;color:{{ dayStatFg }}">{{ dayStat }}</div>
+          </div>
+          <button onClick="{{ onNext }}" disabled="{{ nextDis }}" aria-label="翌日" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#ffffff;color:#333333;border:1px solid #d5d8dc;padding:0;width:36px;width:44px;height:44px" style-hover="background:#f5f6f7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m9 18 6-6-6-6"></path></svg></button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+          <sc-for list="{{ facCards }}" as="c" hint-placeholder-count="5">
+            <div onClick="{{ c.onClick }}" style="border:1px solid #e3e5e8;border-radius:8px;position:relative;cursor:pointer;padding:12px;display:flex;flex-direction:column;gap:10px;border-color:{{ c.bd }}">
+              
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:22px;letter-spacing:.04em;line-height:1">{{ c.code }}</span>
+                <span style="font-size:11px;color:#80858c">出勤 {{ c.workN }}／{{ c.staffN }}名</span>
+                <span style="margin-left:auto;padding:2px 8px;font-size:11px;font-weight:500;background:{{ c.stBg }};color:{{ c.stFg }}">{{ c.status }}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:{{ c.cols }};gap:6px">
+                <sc-for list="{{ c.slots }}" as="s" hint-placeholder-count="3">
+                  <div style="padding:6px 8px;border:1px solid {{ s.bd }};background:{{ s.bg }};display:flex;flex-direction:column;gap:2px;min-height:64px">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:16px">{{ s.label }}</span><span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:13px;color:{{ s.fg }}">{{ s.nText }}</span></div>
+                    <span style="font-size:11px;line-height:1.3;color:{{ s.fg }}">{{ s.names }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#80858c"><span>{{ c.foot }}</span><span style="color:#1f72b8">この施設を調整 →</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- 管理者：変更履歴 -->
+    <sc-if value="{{ isLog }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:{{ pad }};display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;color:#80858c;margin-bottom:2px">{{ logKicker }}</div>
+            <h3 style="margin:0;font-size:20px;font-weight:700">変更履歴</h3>
+          </div>
+          <span style="font-size:12px;color:#5f646b">{{ logCount }}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <sc-for list="{{ logFilters }}" as="x" hint-placeholder-count="5">
+            <button onClick="{{ x.onClick }}" style="min-height:32px;padding:0 12px;border-radius:16px;border:1px solid {{ x.bd }};background:{{ x.bg }};color:{{ x.fg }};cursor:pointer;font:inherit;font-size:12px">{{ x.label }}</button>
+          </sc-for>
+          <sc-for list="{{ logActors }}" as="x" hint-placeholder-count="0">
+            <button onClick="{{ x.onClick }}" style="min-height:32px;padding:0 12px;border-radius:16px;border:1px dashed {{ x.bd }};background:{{ x.bg }};color:{{ x.fg }};cursor:pointer;font:inherit;font-size:12px">{{ x.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;border-top:1px solid #e3e5e8">
+          <sc-for list="{{ logRows }}" as="h" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:{{ logCols }};gap:4px 12px;padding:10px 0;border-bottom:1px solid #e3e5e8;align-items:baseline">
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                <span style="font-size:12px;color:#5f646b">{{ h.at }}</span>
+                <span style="font-size:12px;font-weight:600">{{ h.actor }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <span style="padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;background:{{ h.tagBg }};color:{{ h.tagFg }}">{{ h.cat }}</span>
+                  <span style="font-weight:600;font-size:13px">{{ h.action }}</span>
+                  <span style="font-size:12px;color:#5f646b">{{ h.target }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px">
+                  <sc-if value="{{ h.hasBefore }}" hint-placeholder-val="{{ false }}"><span style="color:#80858c;text-decoration:line-through">{{ h.before }}</span><span style="color:#80858c">→</span></sc-if>
+                  <span style="color:#333333">{{ h.after }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ logEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:24px 0;text-align:center;font-size:13px;color:#80858c">該当する履歴はありません</div>
+          </sc-if>
+        </div>
+        <span style="font-size:11px;color:#80858c">履歴は追記のみで、編集・削除はできません。本番ではデータベース側で自動記録します。</span>
+      </div>
+    </sc-if>
+
+    <!-- 管理者：スタッフ設定・人件費 -->
+    <sc-if value="{{ isCost }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:{{ pad }};display:flex;flex-direction:column;gap:16px">
+        <div>
+          <div style="font-size:12px;color:#80858c;margin-bottom:2px">{{ costKicker }}</div>
+          <h3 style="margin:0;font-size:20px;font-weight:700">2026年11月</h3>
+        </div>
+        <div style="border:1px solid #e3e5e8;border-radius:8px;position:relative;padding:14px;display:flex;flex-direction:column;gap:6px">
+          
+          <span style="font-size:12px;color:#5f646b">人件費見込み（全スタッフ合計）</span>
+          <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:36px;line-height:1">{{ costTotal }}</span>
+          <span style="font-size:12px;color:#5f646b">{{ costBreak }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;border-top:1px solid #e3e5e8">
+          <sc-for list="{{ toggles }}" as="g" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e3e5e8">
+              <div style="flex:1;display:flex;flex-direction:column">
+                <span style="font-weight:500">{{ g.label }}</span>
+                <span style="font-size:11px;color:#80858c">{{ g.sub }}</span>
+              </div>
+              <button onClick="{{ g.onClick }}" aria-pressed="{{ g.on }}" style="width:46px;height:26px;flex:none;position:relative;border-radius:13px;border:1px solid {{ g.bd }};background:{{ g.bg }};cursor:pointer;padding:0">
+                <span style="position:absolute;top:3px;left:{{ g.knob }};width:18px;height:18px;border-radius:50%;background:{{ g.knobBg }}"></span>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ costStaff }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-weight:700;font-size:14px">シフト枠と最低人数（{{ facName }}）</span>
+            <div style="display:flex;flex-direction:column;border-top:1px solid #e3e5e8">
+              <sc-for list="{{ costSlots }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #e3e5e8">
+                  <span style="width:40px;font-weight:600">{{ s.label }}</span>
+                  <span style="flex:1;font-size:12px;color:#5f646b">{{ s.time }}</span>
+                  <span style="font-size:11px;color:#80858c">最低人数</span>
+                  <div style="display:inline-flex;align-items:center;border:1px solid #d5d8dc;border-radius:6px;overflow:hidden">
+                    <button onClick="{{ s.dec }}" aria-label="減らす" style="width:32px;height:30px;border:0;background:#ffffff;cursor:pointer;font-size:15px;color:#333333" style-hover="background:#f5f6f7">−</button>
+                    <span style="min-width:36px;text-align:center;font-weight:600;font-size:13px">{{ s.min }}名</span>
+                    <button onClick="{{ s.inc }}" aria-label="増やす" style="width:32px;height:30px;border:0;background:#ffffff;cursor:pointer;font-size:15px;color:#333333" style-hover="background:#f5f6f7">＋</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11px;color:#80858c">特定の日だけ人数を変える場合は、日次調整の各枠で変更します。</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ costFac }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px">
+            <sc-for list="{{ facCost }}" as="f" hint-placeholder-count="5">
+              <div onClick="{{ f.onClick }}" style="border:1px solid #e3e5e8;border-radius:8px;position:relative;cursor:pointer;padding:12px;display:flex;flex-direction:column;gap:6px">
+                
+                <div style="display:flex;align-items:baseline;justify-content:space-between">
+                  <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:20px;letter-spacing:.04em">{{ f.code }}</span>
+                  <span style="font-size:11px;color:#5f646b">{{ f.staffN }}名 · {{ f.hours }}</span>
+                </div>
+                <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:24px;line-height:1">{{ f.total }}</span>
+                <span style="font-size:11px;color:#5f646b">給与 {{ f.pay }} · 交通費 {{ f.transport }}</span>
+                <span style="font-size:11px;color:#5f646b">希望採用率 <span style="font-weight:700;font-size:14px;color:#1f72b8">{{ f.rate }}</span>（{{ f.rateSub }}）</span>
+                <span style="font-size:11px;color:#1f72b8">スタッフ設定を開く →</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ costStaff }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px">
+          <sc-for list="{{ costRows }}" as="r" hint-placeholder-count="7">
+            <div style="border:1px solid #e3e5e8;border-radius:8px;position:relative;padding:12px;display:flex;flex-direction:column;gap:10px">
+              
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:18px">{{ r.name }}</span>
+                <span style="font-size:12px;color:#5f646b">{{ r.days }}日 · {{ r.hours }}</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:#5f646b">
+                <span style="padding:1px 6px;border-radius:4px;background:#f0f1f3">{{ r.facText }}</span>
+                <span>{{ r.costNote }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#5f646b">
+                <span>希望提出</span><span style="font-weight:600;color:{{ r.subFg }}">{{ r.subText }}</span><span style="color:#e0661a">{{ r.extText }}</span>
+                <button onClick="{{ r.onExt }}" style="margin-left:auto;min-height:28px;padding:0 10px;border:1px solid #d5d8dc;border-radius:6px;background:#ffffff;cursor:pointer;font:inherit;font-size:11px;color:#333333" style-hover="background:#f5f6f7">{{ r.extLabel }}</button>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:8px;align-items:end">
+                <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#80858c">時給（円）</label><input type="number" min="0" step="10" value="{{ r.wage }}" onChange="{{ r.onWage }}" style="width:100%;min-height:36px;padding:0 8px;border:1px solid #d5d8dc;border-radius:6px;background:#ffffff;font:inherit;font-size:14px;color:#333333;box-sizing:border-box"></div>
+                <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#80858c">交通費</label>
+                  <div style="display:inline-flex;border:1px solid #d5d8dc;border-radius:6px;overflow:hidden;display:flex;width:100%">
+                    <button onClick="{{ r.onPer }}" style="flex:1;min-height:36px;border:0;cursor:pointer;font:inherit;font-size:12px;background:{{ r.perBg }};color:{{ r.perFg }}">1出勤</button>
+                    <button onClick="{{ r.onMon }}" style="flex:1;min-height:36px;border:0;border-left:1px solid #e3e5e8;cursor:pointer;font:inherit;font-size:12px;background:{{ r.monBg }};color:{{ r.monFg }}">月額</button>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#80858c">{{ r.amtLabel }}</label><input type="number" min="0" step="10" value="{{ r.amt }}" onChange="{{ r.onAmt }}" style="width:100%;min-height:36px;padding:0 8px;border:1px solid #d5d8dc;border-radius:6px;background:#ffffff;font:inherit;font-size:14px;color:#333333;box-sizing:border-box"></div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#5f646b"><span>{{ r.tenureText }}</span><span style="color:#e0661a">{{ r.capNote }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #e3e5e8;padding-top:8px">
+                <div style="display:flex;align-items:baseline;gap:8px;font-size:11px;color:#5f646b">
+                  <span>希望採用率</span>
+                  <span style="font-weight:700;font-size:17px;color:{{ r.rateFg }}">{{ r.rate }}</span>
+                  <span>{{ r.rateSub }}</span>
+                  <sc-if value="{{ r.hasOffWork }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;padding:1px 6px;border-radius:4px;background:#fdf0e6;color:#e0661a">休希望日に出勤 {{ r.offWork }}日</span></sc-if>
+                </div>
+                <div style="height:6px;border-radius:3px;background:#f0f1f3;overflow:hidden;display:flex">
+                  <span style="width:{{ r.rateW }};background:#2b8fe0"></span><span style="width:{{ r.otherW }};background:#a9d2f5"></span>
+                </div>
+                <span style="font-size:10px;color:#80858c">{{ r.rateNote }}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #e3e5e8;padding-top:8px;font-size:11px;color:#5f646b">
+                <div style="display:flex;flex-direction:column"><span>給与見込み</span><span style="font-size:14px;color:#333333">{{ r.pay }}</span></div>
+                <div style="display:flex;flex-direction:column"><span>交通費</span><span style="font-size:14px;color:#333333">{{ r.transport }}</span></div>
+                <div style="display:flex;flex-direction:column"><span>合計</span><span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:17px;color:#333333">{{ r.total }}</span></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ showPhoneTray }}" hint-placeholder-val="{{ false }}">
+    <div data-drop="tray" style="flex:none;border-top:1px solid {{ trayBd }};background:{{ trayBg }};padding:8px 0 10px">
+      <div style="padding:0 16px 6px;display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:14px">未配置スタッフ {{ unCount }}名</span>
+        <span style="font-size:10px;color:#80858c">長押しで枠へ／タップでシフト選択</span>
+      </div>
+      <div style="display:flex;gap:6px;overflow-x:auto;padding:2px 16px">
+        <sc-for list="{{ tray }}" as="t" hint-placeholder-count="5">
+          <div onPointerDown="{{ t.onDown }}" style="touch-action:none;user-select:none;-webkit-user-select:none;flex:none;cursor:grab;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:6px 10px;min-height:52px;border:1px solid #e3e5e8;border-radius:6px;background:#ffffff;opacity:{{ t.op }}">
+            <span style="font-weight:500;font-size:13px;white-space:nowrap">{{ t.name }}</span>
+            <span style="display:flex;gap:4px;align-items:center"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:{{ t.badgeBg }};color:{{ t.badgeFg }};padding:0 6px;font-size:10px">希望 {{ t.badge }}</span><span style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-size:12px;color:{{ t.assignFg }}">{{ t.assigned }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isPhone }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:none;height:22px;display:flex;align-items:center;justify-content:center"><span style="width:120px;height:4px;background:#333333"></span></div>
+  </sc-if>
+
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:{{ sheetJustify }};background:rgba(0,0,0,.4)">
+      <div onClick="{{ stop }}" style="border:1px solid #e3e5e8;border-radius:8px;position:relative;width:100%;max-width:{{ sheetMax }};background:#ffffff;padding:16px 16px 22px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 28px rgba(0,0,0,.16)">
+        
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <div style="flex:1">
+            <div style="font-size:12px;color:#80858c;margin-bottom:2px">{{ sheetKicker }}</div>
+            <div style="font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:22px;line-height:1.1">{{ sheetTitle }}</div>
+          </div>
+          <sc-if value="{{ sheetHasBadge }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:{{ sheetBadgeBg }};color:{{ sheetBadgeFg }}">希望 {{ sheetBadge }}</span></sc-if>
+          <button onClick="{{ closeSheet }}" aria-label="閉じる" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:transparent;border:0;color:#5f646b;padding:0;width:36px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+        </div>
+        <sc-if value="{{ isConfirmSheet }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <p style="margin:0;font-size:13px;color:#333333;text-wrap:pretty">{{ cfText }}</p>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;max-height:132px;overflow:auto">
+              <sc-for list="{{ cfDays }}" as="c" hint-placeholder-count="6">
+                <button onClick="{{ c.onClick }}" style="min-width:58px;min-height:32px;padding:0 8px;border:1px dashed #b8bcc2;border-radius:6px;background:#ffffff;cursor:pointer;font:inherit;font-size:12px;color:{{ c.fg }}" style-hover="background:#f5f6f7">{{ c.t }}</button>
+              </sc-for>
+            </div>
+            <span style="font-size:11px;color:#80858c">日付をタップすると、その日の入力に戻ります。</span>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button onClick="{{ closeSheet }}" style="min-height:46px;border:1px solid #d5d8dc;border-radius:6px;background:#ffffff;cursor:pointer;font:inherit;font-size:14px;font-weight:600;color:#333333" style-hover="background:#f5f6f7">戻って入力する</button>
+              <button onClick="{{ cfSubmit }}" style="min-height:46px;border:0;border-radius:6px;background:#2b8fe0;cursor:pointer;font:inherit;font-size:14px;font-weight:600;color:#ffffff" style-hover="background:#1f72b8">空欄のまま提出</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isChoiceSheet }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:{{ sheetCols }};border:1px solid #e3e5e8">
+            <sc-for list="{{ sheetOpts }}" as="o" hint-placeholder-count="5">
+              <button onClick="{{ o.onClick }}" style="min-height:56px;border:0;border-left:{{ o.bl }};background:{{ o.bg }};color:{{ o.fg }};cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-weight:600;font-size:17px;line-height:1">{{ o.label }}<span style="font-size:9px;font-weight:400;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif">{{ o.sub }}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showTime }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end">
+              <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#80858c">開始</label><select value="{{ tStart }}" onChange="{{ onStart }}" style="width:100%;min-height:36px;padding:0 8px;border:1px solid #d5d8dc;border-radius:6px;background:#ffffff;font:inherit;font-size:14px;color:#333333;box-sizing:border-box"><sc-for list="{{ startOpts }}" as="o" hint-placeholder-count="0"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select></div>
+              <span style="padding-bottom:8px">〜</span>
+              <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#80858c">終了</label><select value="{{ tEnd }}" onChange="{{ onEnd }}" style="width:100%;min-height:36px;padding:0 8px;border:1px solid #d5d8dc;border-radius:6px;background:#ffffff;font:inherit;font-size:14px;color:#333333;box-sizing:border-box"><sc-for list="{{ endOpts }}" as="o" hint-placeholder-count="0"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div style="display:inline-flex;border:1px solid #d5d8dc;border-radius:6px;overflow:hidden">
+                <button onClick="{{ step15 }}" style="border:0;cursor:pointer;padding:5px 10px;font:inherit;font-size:12px;background:{{ s15Bg }};color:{{ s15Fg }}">15分刻み</button>
+                <button onClick="{{ step30 }}" style="border:0;border-left:1px solid #e3e5e8;cursor:pointer;padding:5px 10px;font:inherit;font-size:12px;background:{{ s30Bg }};color:{{ s30Fg }}">30分刻み</button>
+              </div>
+              <span style="font-size:12px;color:#5f646b">{{ tSummary }}</span>
+            </div>
+            <span style="font-size:12px;color:#195d96">{{ tCover }}</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ sheetInfo }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:12px;padding:8px 10px;border:1px solid #f5c9a8;border-radius:6px;background:#fdf0e6;color:#b4500f">{{ sheetInfoText }}</div>
+        </sc-if>
+        <sc-if value="{{ sheetWarn }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:12px;font-weight:500;padding:8px 10px;border:1px solid #f4b4b6;background:#fdeeee;color:#c62f35">{{ sheetWarnText }}</div>
+        </sc-if>
+        <sc-if value="{{ sheetHasLog }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-size:12px;font-weight:700">このシフトの履歴</span>
+              <button onClick="{{ openLog }}" style="border:0;background:transparent;cursor:pointer;font:inherit;font-size:11px;color:#1f72b8;padding:4px 0">すべての履歴 →</button>
+            </div>
+            <div style="display:flex;flex-direction:column;border-top:1px solid #e3e5e8;max-height:132px;overflow:auto">
+              <sc-for list="{{ sheetLog }}" as="h" hint-placeholder-count="2">
+                <div style="display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid #e3e5e8;font-size:11px">
+                  <span style="flex:none;color:#80858c">{{ h.at }}</span>
+                  <span style="flex:none;font-weight:600">{{ h.actor }}</span>
+                  <span style="flex:1;min-width:0;color:#333333">{{ h.change }}</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{ sheetLogEmpty }}" hint-placeholder-val="{{ false }}"><span style="padding:6px 0;font-size:11px;color:#80858c">まだ変更はありません</span></sc-if>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isSlotSheet }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;max-height:340px;overflow:auto;border-top:1px solid #e3e5e8">
+            <sc-for list="{{ cands }}" as="c" hint-placeholder-count="5">
+              <button onClick="{{ c.onClick }}" style="display:flex;align-items:center;gap:8px;min-height:48px;padding:0 4px;border:0;border-bottom:1px solid #e3e5e8;background:transparent;cursor:pointer;font:inherit;color:inherit;text-align:left">
+                <span style="font-weight:500;flex:1">{{ c.name }}</span>
+                <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(0,0,0,.06);font-size:12px;font-weight:500;white-space:nowrap;background:{{ c.badgeBg }};color:{{ c.badgeFg }};padding:1px 7px">希望 {{ c.badge }}</span>
+                <span style="width:64px;text-align:right;font-size:11px;color:{{ c.curFg }}">{{ c.cur }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <sc-if value="{{ canClear }}" hint-placeholder-val="{{ false }}"><button onClick="{{ onClear }}" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#ffffff;color:#333333;border:1px solid #d5d8dc;min-height:44px" style-hover="background:#f5f6f7">{{ clearLabel }}</button></sc-if>
+          <sc-if value="{{ showTime }}" hint-placeholder-val="{{ false }}"><button onClick="{{ onConfirmTime }}" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;background:#2b8fe0;color:#ffffff;border:1px solid #2b8fe0;min-height:44px;min-width:120px" style-hover="background:#1f72b8;border-color:#1f72b8">この時刻で決定</button></sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ dragging }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:{{ ghostX }}px;top:{{ ghostY }}px;transform:translate(-50%,-130%);pointer-events:none;z-index:40;padding:10px 14px;border-radius:6px;background:#2b8fe0;color:#ffffff;box-shadow:0 8px 28px rgba(0,0,0,.16);font-weight:500;white-space:nowrap">{{ ghostName }} → {{ ghostTarget }}</div>
+  </sc-if>
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:50%;bottom:120px;transform:translateX(-50%);z-index:30;padding:8px 14px;border-radius:6px;background:#333333;color:#ffffff;font-size:13px;white-space:nowrap">{{ toast }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;layout&quot;:{&quot;label&quot;:&quot;レイアウト&quot;,&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;phone&quot;,&quot;desktop&quot;],&quot;optionLabels&quot;:{&quot;phone&quot;:&quot;スマホ&quot;,&quot;desktop&quot;:&quot;PC&quot;},&quot;default&quot;:&quot;phone&quot;,&quot;tsType&quot;:&quot;'phone'|'desktop'&quot;},&quot;defaultRole&quot;:{&quot;label&quot;:&quot;表示モード&quot;,&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;staff&quot;,&quot;admin&quot;],&quot;optionLabels&quot;:{&quot;staff&quot;:&quot;スタッフ&quot;,&quot;admin&quot;:&quot;管理者&quot;},&quot;default&quot;:&quot;staff&quot;,&quot;tsType&quot;:&quot;'staff'|'admin'&quot;},&quot;defaultFacility&quot;:{&quot;label&quot;:&quot;初期の施設&quot;,&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;all&quot;,&quot;BHJ&quot;,&quot;BHKK&quot;,&quot;MAHB&quot;,&quot;MAHT&quot;,&quot;MAHNM&quot;],&quot;optionLabels&quot;:{&quot;all&quot;:&quot;全施設&quot;},&quot;default&quot;:&quot;BHJ&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;defaultTab&quot;:{&quot;label&quot;:&quot;初期タブ&quot;,&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;req&quot;,&quot;view&quot;,&quot;daily&quot;,&quot;month&quot;,&quot;cost&quot;],&quot;optionLabels&quot;:{&quot;&quot;:&quot;自動&quot;,&quot;req&quot;:&quot;希望入力&quot;,&quot;view&quot;:&quot;確定シフト&quot;,&quot;daily&quot;:&quot;日次調整&quot;,&quot;month&quot;:&quot;月間&quot;,&quot;cost&quot;:&quot;人件費&quot;},&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;dailyVariant&quot;:{&quot;label&quot;:&quot;日次調整の案&quot;,&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;slots&quot;,&quot;people&quot;],&quot;optionLabels&quot;:{&quot;slots&quot;:&quot;案A 枠に入れる&quot;,&quot;people&quot;:&quot;案B 人から選ぶ&quot;},&quot;default&quot;:&quot;slots&quot;,&quot;tsType&quot;:&quot;'slots'|'people'&quot;},&quot;timeStep&quot;:{&quot;label&quot;:&quot;時刻の刻み（分）&quot;,&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;15&quot;,&quot;30&quot;],&quot;default&quot;:&quot;30&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;startDay&quot;:{&quot;label&quot;:&quot;初期表示の日付&quot;,&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:10,&quot;min&quot;:1,&quot;max&quot;:30,&quot;unit&quot;:&quot;日&quot;,&quot;tsType&quot;:&quot;number&quot;}}">
+const RED = '#e5484d', RED_BG = '#fdeeee', RED_BD = '#f4b4b6';
+const TC = { 'tag-accent': ['#eaf4fd', '#1f72b8'], 'tag-neutral': ['#f0f1f3', '#5f646b'], 'tag-outline': ['#ffffff', '#5f646b'], 'tag-off': ['#fdf0e6', '#e0661a'] };
+const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+const ME = 's3';
+const ON = { bg: '#2b8fe0', fg: '#ffffff' }, OFF = { bg: 'transparent', fg: '#333333' };
+const ORDER = ['morning', 'evening', 'night', 'base'];
+const EXT_TO = '2026-10-27';
+const yen = (n) => '¥' + Math.round(n).toLocaleString('ja-JP');
+const cols = (n) => `repeat(${n},minmax(0,1fr))`;
+
+class Component extends DCLogic {
+  state = { logCat: 'all', logActor: null, db: null, fac: 'BHJ', sfac: null, role: null, tabs: {}, day: 10, sheet: null, drag: null, over: null, toast: null, draft: {}, dirty: false, step: 30 };
+  rootRef = React.createRef();
+
+  componentDidMount() {
+    const p = this.props;
+    const role = p.defaultRole || 'staff';
+    this.setState({ role, fac: p.defaultFacility || 'BHJ', tabs: p.defaultTab ? { [role]: p.defaultTab } : {}, day: +(p.startDay || 10), step: +(p.timeStep || 30) });
+    this.onMove = this.onMove.bind(this); this.onUp = this.onUp.bind(this);
+    const go = () => {
+      const D = window.ShiftData;
+      if (!D || !D.violations) { this.t = setTimeout(go, 40); return; }
+      this.unsub = D.repo.subscribe((db) => this.setState({ db }));
+      D.repo.load().then((db) => this.setState({ db, draft: this.draftFrom(db) }));
+    };
+    go();
+  }
+  componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.tt); clearTimeout(this.lp); this.unsub && this.unsub(); this.detach(); }
+
+  get U() { return window.ShiftData.util; }
+  F(id) { return this.state.db.facilities.find((f) => f.id === id); }
+  slot(fid, key) { const f = this.F(fid); return f && f.slots.find((s) => s.key === key); }
+  draftFrom(db) { const m = {}; db.requests.filter((r) => r.staffId === ME).forEach((r) => (m[r.date] = r)); return m; }
+  flash(msg) { this.setState({ toast: msg }); clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: null }), 2200); }
+  dk() { return this.U.dateKey(this.state.day); }
+  shiftAt(sid, date, fid) { return this.state.db.shifts.find((s) => s.staffId === sid && s.date === date && s.facilityId === fid); }
+  elsewhere(sid, date, fid, onlyConfirmed) { return this.state.db.shifts.find((s) => s.staffId === sid && s.date === date && s.facilityId !== fid && (!onlyConfirmed || s.status === 'confirmed')); }
+  reqOf(sid, date) { return this.state.db.requests.find((r) => r.staffId === sid && r.date === date); }
+  short(t) { const [h, m] = t.split(':'); return String(+h) + (m !== '00' ? ':' + m : ''); }
+  long(s) { const U = this.U; return s.start + '–' + (U.toMin(s.end) <= U.toMin(s.start) ? '翌' : '') + s.end; }
+  lab(s) { return s.kind === 'custom' ? this.short(s.start) + '-' + this.short(s.end) : window.ShiftData.LABEL[s.kind]; }
+  badge(r) {
+    if (!r) return { t: '—', c: 'tag-neutral' };
+    if (r.type === 'off') return { t: '休', c: 'tag-off' };
+    if (r.type === 'custom') return { t: this.short(r.start) + '-' + this.short(r.end), c: 'tag-outline' };
+    return { t: window.ShiftData.LABEL[r.type], c: 'tag-accent' };
+  }
+  fmt(iso) { const [y, m, d] = iso.slice(0, 10).split('-').map(Number); return `${m}/${d}（${DOW[new Date(y, m - 1, d).getDay()]}）`; }
+  vioOf(s) { return (this.vio && this.vio[s.id]) || null; }
+  issueText(s) { const x = this.vioOf(s); return !x ? '' : x.type === 'overlap' ? '重複' : 'インターバル'; }
+  /** 希望の選択肢：「基本」は出さず、朝・夕どちらも可を「朝夕」として出す */
+  reqKeys(me) { const k = ['morning', 'evening', 'night'].filter((x) => me.facilityIds.some((f) => this.slot(f, x))); if (k.includes('morning') || k.includes('evening')) k.splice(k.includes('evening') ? k.indexOf('evening') + 1 : 1, 0, 'both'); return k; }
+  /** 希望 r とシフト kind が一致するか（朝夕＝朝・夕・基本のいずれでも一致） */
+  reqMatch(r, kind) { return r.type === 'both' ? ['morning', 'evening', 'base'].includes(kind) : r.type === kind; }
+
+  /** 希望採用率：出勤希望（休以外）のうち、希望どおりの枠・時刻で配置された日の割合（施設は問わない） */
+  adoption(sid) {
+    const db = this.state.db; let want = 0, hit = 0, other = 0, offWork = 0;
+    for (const r of db.requests.filter((x) => x.staffId === sid)) {
+      const ss = db.shifts.filter((s) => s.staffId === sid && s.date === r.date);
+      if (r.type === 'off') { if (ss.length) offWork++; continue; }
+      want++;
+      if (!ss.length) continue;
+      const same = ss.some((s) => (r.type === 'custom' ? s.kind === 'custom' && s.start === r.start && s.end === r.end : this.reqMatch(r, s.kind)));
+      same ? hit++ : other++;
+    }
+    return { want, hit, other, offWork, rate: want ? hit / want : 0 };
+  }
+
+  hAt(iso) { const t = new Date(iso); const p = (n) => String(n).padStart(2, '0'); return `${t.getMonth() + 1}/${t.getDate()} ${p(t.getHours())}:${p(t.getMinutes())}`; }
+  hTarget(h) {
+    const st = h.staffId && this.state.db.staff.find((s) => s.id === h.staffId);
+    return [h.facilityId, h.date ? `11/${+h.date.slice(8, 10)}` : '', st ? st.name : ''].filter(Boolean).join(' · ');
+  }
+  submitReq() { window.ShiftData.repo.saveRequests(ME, Object.values(this.state.draft), true).then(() => { this.setState({ dirty: false, sheet: null }); this.flash('希望を提出しました'); }); }
+  setTab(role, t) { this.setState((s) => ({ tabs: { ...s.tabs, [role]: t }, sheet: null })); }
+  assign(sid, kind, start, end) {
+    const fac = this.state.fac, sl = kind && kind !== 'custom' ? this.slot(fac, kind) : null;
+    const shift = kind ? { kind, start: sl ? sl.start : start, end: sl ? sl.end : end, source: 'admin', status: 'draft' } : null;
+    window.ShiftData.repo.setShift(sid, this.dk(), fac, shift);
+  }
+  setDraft(date, r) { this.setState((s) => { const d = { ...s.draft }; if (r) d[date] = { ...(d[date] || {}), staffId: ME, date, ...r }; else delete d[date]; if (r && r.type !== 'custom') { delete d[date].start; delete d[date].end; } return { draft: d, dirty: true, sheet: null }; }); }
+  openReq(d) { const date = this.U.dateKey(d), r = this.state.draft[date]; this.setState({ sheet: { type: 'req', date, d, choice: r ? r.type : null, start: (r && r.start) || '10:00', end: (r && r.end) || '16:00' } }); }
+  openPerson(sid, force) {
+    const date = this.dk(), sh = this.shiftAt(sid, date, this.state.fac), rq = this.reqOf(sid, date);
+    const src = sh && sh.kind === 'custom' ? sh : rq && rq.type === 'custom' ? rq : null;
+    this.setState({ sheet: { type: 'person', sid, choice: force || (sh ? sh.kind : 'off'), start: src ? src.start : '10:00', end: src ? src.end : '16:00' } });
+  }
+  openSlot(key) { this.setState({ sheet: { type: 'slot', key } }); }
+  patchSheet(p) { this.setState((s) => ({ sheet: { ...s.sheet, ...p } })); }
+
+  // ── 長押し / ドラッグ ──
+  pressStart(sid, e) {
+    if (e.button) return;
+    if (e.pointerType === 'mouse') e.preventDefault();
+    this.press = { sid, x: e.clientX, y: e.clientY, type: e.pointerType, active: false };
+    window.addEventListener('pointermove', this.onMove, { passive: false });
+    window.addEventListener('pointerup', this.onUp); window.addEventListener('pointercancel', this.onUp);
+    clearTimeout(this.lp);
+    if (e.pointerType !== 'mouse') this.lp = setTimeout(() => this.activate(), 380);
+  }
+  activate() { const p = this.press; if (!p) return; p.active = true; if (navigator.vibrate) navigator.vibrate(12); this.track(p.x, p.y); }
+  onMove(e) {
+    const p = this.press; if (!p) return;
+    if (!p.active) {
+      const dist = Math.hypot(e.clientX - p.x, e.clientY - p.y);
+      if (p.type === 'mouse' && dist > 5) { p.x = e.clientX; p.y = e.clientY; this.activate(); }
+      else if (p.type !== 'mouse' && dist > 10) { clearTimeout(this.lp); this.press = null; this.detach(); }
+      return;
+    }
+    e.preventDefault(); this.track(e.clientX, e.clientY);
+  }
+  track(x, y) {
+    const root = this.rootRef.current; if (!root) return;
+    const r = root.getBoundingClientRect(), k = r.width / root.offsetWidth || 1;
+    const el = document.elementFromPoint(x, y), t = el && el.closest('[data-drop]');
+    this.setState({ drag: { sid: this.press.sid, x: (x - r.left) / k, y: (y - r.top) / k }, over: t && root.contains(t) ? t.getAttribute('data-drop') : null });
+  }
+  onUp() {
+    const p = this.press; this.press = null; clearTimeout(this.lp); this.detach();
+    if (!p) return;
+    if (!p.active) { this.openPerson(p.sid); return; }
+    const over = this.state.over;
+    if (over === 'tray') this.assign(p.sid, null);
+    else if (over) this.assign(p.sid, over);
+    this.setState({ drag: null, over: null });
+  }
+  detach() { window.removeEventListener('pointermove', this.onMove); window.removeEventListener('pointerup', this.onUp); window.removeEventListener('pointercancel', this.onUp); }
+
+  timeOpts(step, val, startVal) {
+    const U = this.U, out = []; const sm = startVal != null ? U.toMin(startVal) : null;
+    for (let m = 0; m < 1440; m += step) out.push(m);
+    const vm = U.toMin(val); if (!out.includes(vm)) { out.push(vm); out.sort((a, b) => a - b); }
+    return out.map((m) => ({ v: U.fromMin(m), l: (sm != null && m <= sm ? '翌 ' : '') + U.fromMin(m) }));
+  }
+
+  renderVals() {
+    const S = this.state, D = window.ShiftData, full = S.db;
+    const isPhone = (this.props.layout || 'phone') !== 'desktop', isDesktop = !isPhone;
+    const role = S.role || this.props.defaultRole || 'staff', admin = role === 'admin';
+    const tab = S.tabs[role] || (admin ? 'daily' : 'req');
+    const tabDefs = admin ? [['daily', '日次調整'], ['month', '月間'], ['cost', 'スタッフ・人件費'], ['log', '履歴']] : [['req', '希望入力'], ['view', '確定シフト']];
+    const v = {
+      rootRef: this.rootRef, isPhone, isDesktop, loading: !full, userLabel: '', isAdmin: admin && !!full, showFacTabs: false,
+      staffBg: admin ? OFF.bg : ON.bg, staffFg: admin ? OFF.fg : ON.fg, adminBg: admin ? ON.bg : OFF.bg, adminFg: admin ? ON.fg : OFF.fg,
+      setStaff: () => this.setState({ role: 'staff', sheet: null }), setAdmin: () => this.setState({ role: 'admin', sheet: null }), isAllDaily: false, costFac: false, costStaff: false,
+      tabs: tabDefs.map(([k, l]) => ({ label: l, onClick: () => this.setTab(role, k), fg: k === tab ? '#1f72b8' : '#80858c', bar: 'none', barDesk: k === tab ? 'inset 0 -2px 0 #2b8fe0' : 'none' })),
+      isReq: false, reqLocked: false, showMatrix: false, isView: false, isMonth: false, isDaily: false, isDailyA: false, isDailyB: false, isCost: false, isLog: false, sheetHasLog: false, isConfirmSheet: false, showPhoneTray: false,
+      sheetOpen: false, dragging: false, hasToast: !!S.toast, toast: S.toast || '', pad: isPhone ? '16px' : '24px',
+      stop: (e) => e.stopPropagation(), closeSheet: () => this.setState({ sheet: null }),
+    };
+    if (!full) return v;
+    const U = this.U;
+    this.vio = D.violations(full);
+    const me = full.staff.find((s) => s.id === ME);
+    const sfac = S.sfac || me.facilityIds[0];
+    const fac = admin ? S.fac : sfac, allMode = admin && fac === 'all';
+    const db = D.scope(full, allMode ? null : fac);
+    const fslots = allMode ? [] : this.F(fac).slots;
+    const staffName = (id) => (full.staff.find((s) => s.id === id) || {}).name || '';
+    const issues = (fid, d) => {
+      const date = U.dateKey(d), ds = full.shifts.filter((s) => s.facilityId === fid && s.date === date);
+      const sl = this.F(fid).slots.map((x) => ({ ...x, n: ds.filter((s) => U.overlap(U.span(s), U.span(x))).length, min: D.minFor(full, fid, date, x.key) }));
+      return { ds, sl, gaps: sl.filter((x) => x.n < x.min).length, ng: ds.filter((s) => this.vioOf(s)).length, draft: ds.filter((s) => s.status === 'draft').length };
+    };
+    const monthIssues = (fid) => { let n = 0; for (let d = 1; d <= 30; d++) { const x = issues(fid, d); n += x.gaps + x.ng; } return n; };
+    const goFac = (id, t) => this.setState((s) => ({ fac: id, sheet: null, tabs: t ? { ...s.tabs, admin: t } : s.tabs }));
+    const days = Array.from({ length: 30 }, (_, i) => i + 1);
+    const dayHead = (d, on, title, onClick) => { const w = U.dow(d); return { d, w: DOW[w], fg: w === 0 ? RED : w === 6 ? '#1f72b8' : '#333333', bg: on ? '#d6eafb' : '#ffffff', cursor: onClick ? 'pointer' : 'default', title, onClick }; };
+    const tabBtn = (id, label, n, on, onClick) => ({ label, n, hasN: n > 0, bg: on ? '#2b8fe0' : '#ffffff', fg: on ? '#ffffff' : '#333333', bd: on ? '#2b8fe0' : '#d5d8dc', onClick });
+    v.userLabel = admin ? '管理者 · ' + (allMode ? '全施設' : fac) : `${me.name} · ${me.facilityIds.join('・')}`;
+
+    if (admin) {
+      const cnt = D.FACILITIES.map((f) => ({ id: f.id, n: tab === 'daily' ? (() => { const x = issues(f.id, S.day); return x.gaps + x.ng; })() : monthIssues(f.id) }));
+      v.facTabs = [{ id: 'all', label: '全施設', n: cnt.reduce((a, c) => a + c.n, 0) }].concat(cnt.map((c) => ({ id: c.id, label: c.id, n: c.n })))
+        .map((t) => tabBtn(t.id, t.label, t.n, t.id === fac, () => goFac(t.id)));
+      v.showFacTabs = true;
+    } else if (tab === 'view' && me.facilityIds.length > 1) {
+      v.facTabs = me.facilityIds.map((id) => tabBtn(id, id, 0, id === sfac, () => this.setState({ sfac: id })));
+      v.showFacTabs = true;
+    }
+
+    // ── スタッフ：希望入力 ──
+    if (!admin && tab === 'req') {
+      const sub = full.submissions.find((s) => s.staffId === ME);
+      const locked = D.TODAY > D.deadlineFor(full, ME);
+      const keys = this.reqKeys(me).concat(['custom', 'off']);
+      const counts = {}; keys.forEach((k) => (counts[k] = 0));
+      const cells = [];
+      for (let i = 0; i < U.dow(1); i++) cells.push({ vis: 'hidden', d: '', label: '', time: '', bd: 'transparent', bg: 'transparent' });
+      for (let d = 1; d <= 30; d++) {
+        const r = S.draft[U.dateKey(d)], w = U.dow(d);
+        if (r && counts[r.type] != null) counts[r.type]++;
+        cells.push({ vis: 'visible', d, label: r ? D.LABEL[r.type] : '', time: r && r.type === 'custom' ? this.short(r.start) + '-' + this.short(r.end) : '',
+          bg: !r ? 'transparent' : r.type === 'off' ? '#fdf0e6' : '#eaf4fd', bd: r ? '#a9d2f5' : '#e3e5e8',
+          fg: r && r.type === 'off' ? '#e0661a' : '#195d96', dayFg: w === 0 ? RED : w === 6 ? '#1f72b8' : '#5f646b',
+          onClick: locked ? () => this.flash('提出期限を過ぎているため変更できません') : () => this.openReq(d) });
+      }
+      const at = sub && sub.submittedAt ? new Date(sub.submittedAt) : null;
+      const st = S.dirty ? 'tag-outline' : at ? 'tag-accent' : 'tag-neutral';
+      Object.assign(v, {
+        isReq: true, calCells: cells, dowHead: DOW.map((t, i) => ({ t, fg: i === 0 ? RED : i === 6 ? '#1f72b8' : '#80858c' })),
+        reqKicker: `提出期限 ${this.fmt(D.DEADLINE)}` + (sub.extendedUntil ? ` → 延長 ${this.fmt(sub.extendedUntil)}まで` : ''),
+        reqLocked: locked, reqLockText: '提出期限を過ぎたため変更できません。変更が必要な場合は、管理者に期限の延長を依頼してください。',
+        reqCounts: keys.map((k) => ({ label: k === 'custom' ? '時間指定' : D.LABEL[k], n: counts[k] })).concat([{ label: '空欄', n: 30 - Object.keys(S.draft).length }]),
+        subText: S.dirty ? '未保存の変更あり' : at ? `提出済 ${at.getMonth() + 1}/${at.getDate()} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '未提出',
+        subBg: TC[st][0], subFg: TC[st][1],
+        submitLabel: at ? '変更を保存して再提出' : '保存して提出',
+        onSubmit: () => { const blanks = days.filter((d) => !S.draft[U.dateKey(d)]); if (blanks.length) this.setState({ sheet: { type: 'confirm', blanks } }); else this.submitReq(); },
+      });
+    }
+
+    // ── スタッフ：確定シフト／管理者：施設の月間 ──
+    if ((!admin && tab === 'view') || (admin && !allMode && tab === 'month')) {
+      const staffMode = !admin, ok = (s) => !staffMode || s.status === 'confirmed';
+      const list = db.shifts.filter(ok), drafts = db.shifts.filter((s) => s.status === 'draft').length;
+      const mine = full.shifts.filter((s) => s.staffId === ME && ok(s));
+      Object.assign(v, {
+        showMatrix: true, isView: staffMode, isMonth: !staffMode, mxMaxH: isPhone ? 'none' : '560px',
+        mxKicker: staffMode ? `${fac} · 確定シフト · 閲覧のみ` : `${fac} · 月間マトリックス · 日付タップで日次調整へ`,
+        mySummary: `あなた（全施設）：${new Set(mine.map((s) => s.date)).size}日 · ${(mine.reduce((a, s) => { const p = U.span(s); return a + p[1] - p[0]; }, 0) / 60).toFixed(1)}h`,
+        viewNotice: staffMode && drafts > 0, viewNoticeText: `管理者が調整中の変更（${drafts}件）は、確定後にここへ反映されます。`,
+        noDrafts: drafts === 0, confirmLabel: drafts ? `確定して公開（未確定 ${drafts}件）` : 'すべて確定済み',
+        onConfirmAll: () => D.repo.confirmAll(fac).then((r) => this.flash(`確定しました · ${r.notified}名にメールで通知`)),
+        mxDays: days.map((d) => dayHead(d, !staffMode && d === S.day, staffMode ? '' : `11/${d} の日次調整を開く`, staffMode ? undefined : () => this.setState((s) => ({ day: d, tabs: { ...s.tabs, admin: 'daily' } })))),
+        mxRows: db.staff.map((st) => {
+          const mine = staffMode && st.id === ME, rowBg = mine ? '#eaf4fd' : 'transparent';
+          return { name: st.name, cursor: 'default', fw: mine ? 600 : 400, bg: mine ? '#d6eafb' : '#ffffff',
+            cells: days.map((d) => {
+              const date = U.dateKey(d), s = list.find((x) => x.staffId === st.id && x.date === date);
+              if (!s) {
+                const o = full.shifts.find((x) => x.staffId === st.id && x.date === date && x.facilityId !== fac && ok(x));
+                if (o) return { t: o.facilityId, chip: '#ffffff', fg: '#80858c', bg: rowBg, sh: 'none', title: `${st.name} ${o.facilityId}で勤務 ${this.long(o)}` };
+                return { t: '休', chip: '#fdf0e6', fg: '#e0661a', bg: rowBg, sh: 'none', title: '' };
+              }
+              const x = this.vioOf(s);
+              return { t: this.lab(s), chip: x ? RED : '#5a5f66', fg: '#ffffff', bg: x ? RED_BG : rowBg,
+                sh: x ? `inset 0 0 0 1px ${RED}` : !staffMode && s.status === 'draft' ? 'inset 0 -3px 0 #2b8fe0' : 'none',
+                title: `${st.name} ${this.long(s)}${x ? ' · ' + x.msg : ''}${s.status === 'draft' ? ' · 未確定' : ''}` };
+            }) };
+        }),
+        mxCounts: staffMode ? [] : fslots.map((sl, i) => ({ label: `${sl.label} 配置数`, bt: i === 0 ? '1px solid #e3e5e8' : 'none',
+          cells: days.map((d) => { const x = issues(fac, d).sl[i]; return { t: x.n, bg: x.n >= x.min ? '#f7f8f9' : RED_BG, fg: x.n >= x.min ? '#333333' : RED }; }) })),
+        mxLegend: staffMode
+          ? [{ t: '自分の行', bg: '#d6eafb', sh: 'none' }, { t: '施設名＝その施設で勤務', bg: '#ffffff', sh: 'none' }, { t: 'NG（インターバル・重複）', bg: RED_BG, sh: `inset 0 0 0 1px ${RED}` }]
+          : [{ t: '未確定', bg: 'transparent', sh: 'inset 0 -3px 0 #2b8fe0' }, { t: 'NG（インターバル8h未満・重複）／最低人数に不足', bg: RED_BG, sh: `inset 0 0 0 1px ${RED}` }, { t: '施設名＝兼任先で勤務', bg: '#ffffff', sh: 'none' }],
+      });
+    }
+
+    // ── 管理者：全施設 日次 ──
+    if (admin && allMode && tab === 'daily') {
+      let tg = 0, tn = 0, td = 0;
+      const cards = D.FACILITIES.map((f) => {
+        const x = issues(f.id, S.day); tg += x.gaps; tn += x.ng; td += x.draft;
+        const bad = x.gaps + x.ng > 0;
+        return { code: f.id, staffN: D.scope(full, f.id).staff.length, workN: new Set(x.ds.map((s) => s.staffId)).size, cols: cols(x.sl.length),
+          status: bad ? [x.gaps ? `欠員${x.gaps}` : '', x.ng ? `NG${x.ng}` : ''].filter(Boolean).join('・') : '問題なし',
+          stBg: bad ? RED : '#eaf4fd', stFg: bad ? '#fff' : '#195d96', bd: bad ? RED_BD : '#e3e5e8',
+          foot: x.draft ? `未確定 ${x.draft}件` : '確定済み', onClick: () => goFac(f.id, 'daily'),
+          slots: x.sl.map((sl) => { const mem = x.ds.filter((s) => U.overlap(U.span(s), U.span(sl))), e = sl.n < sl.min;
+            return { label: sl.label, nText: `${sl.n}/${sl.min}名`, names: mem.map((s) => staffName(s.staffId).split(' ')[0]).join('、') || '欠員', fg: e ? RED : '#333333', bg: e ? RED_BG : 'transparent', bd: e ? RED_BD : '#e3e5e8' }; }) };
+      });
+      Object.assign(v, { isAllDaily: true, facCards: cards, dayTitle: `11月${S.day}日（${DOW[U.dow(S.day)]}）`,
+        dayStat: '全施設 · ' + ([tg ? `欠員 ${tg}枠` : '', tn ? `NG ${tn}件` : '', td ? `未確定 ${td}件` : ''].filter(Boolean).join(' · ') || '問題なし'), dayStatFg: tg || tn ? RED : '#80858c',
+        prevDis: S.day <= 1, nextDis: S.day >= 30, onPrev: () => this.setState((s) => ({ day: Math.max(1, s.day - 1) })), onNext: () => this.setState((s) => ({ day: Math.min(30, s.day + 1) })) });
+    }
+
+    // ── 管理者：全施設 月間 ──
+    if (admin && allMode && tab === 'month') {
+      const drafts = full.shifts.filter((s) => s.status === 'draft').length;
+      Object.assign(v, { showMatrix: true, isView: false, isMonth: true, mxMaxH: isPhone ? 'none' : '560px', viewNotice: false,
+        mxKicker: '全施設 · 欠員とNGの件数 · 施設名タップで施設の月間へ',
+        noDrafts: drafts === 0, confirmLabel: drafts ? `全施設を確定して公開（未確定 ${drafts}件）` : 'すべて確定済み',
+        onConfirmAll: () => D.repo.confirmAll(null).then((r) => this.flash(`全施設を確定しました · ${r.notified}名にメールで通知`)),
+        mxDays: days.map((d) => dayHead(d, d === S.day, `11/${d} の全施設一覧を開く`, () => this.setState((s) => ({ day: d, tabs: { ...s.tabs, admin: 'daily' } })))),
+        mxRows: D.FACILITIES.map((f) => ({ name: f.id, fw: 600, bg: '#ffffff', cursor: 'pointer', onClick: () => goFac(f.id, 'month'),
+          cells: days.map((d) => { const x = issues(f.id, d), n = x.gaps + x.ng;
+            return { t: n ? n : '○', chip: n ? RED : 'transparent', fg: n ? '#ffffff' : '#b8bcc2', bg: n ? RED_BG : 'transparent', sh: n ? `inset 0 0 0 1px ${RED}` : x.draft ? 'inset 0 -3px 0 #2b8fe0' : 'none',
+              title: `${f.id} 11/${d}${x.gaps ? ` 欠員${x.gaps}枠` : ''}${x.ng ? ` NG${x.ng}件` : ''}${x.draft ? ` 未確定${x.draft}件` : ''}` }; }) })),
+        mxCounts: [], mxLegend: [{ t: '数字＝欠員枠＋NG件数', bg: RED_BG, sh: `inset 0 0 0 1px ${RED}` }, { t: '未確定あり', bg: 'transparent', sh: 'inset 0 -3px 0 #2b8fe0' }] });
+    }
+
+    // ── 管理者：施設の日次調整 ──
+    if (admin && !allMode && tab === 'daily') {
+      const date = this.dk(), dayShifts = db.shifts.filter((s) => s.date === date), dragSid = S.drag && S.drag.sid;
+      const variantB = isPhone && this.props.dailyVariant === 'people';
+      const slots = fslots.map((sl) => {
+        const ss = U.span(sl), mem = dayShifts.filter((s) => U.overlap(U.span(s), ss)), over = S.over === sl.key;
+        const min = D.minFor(full, fac, date, sl.key), short = mem.length < min, empty = !mem.length;
+        const ovr = (full.minOverrides || {})[`${fac}|${date}|${sl.key}`] != null;
+        const setMin = (n) => D.repo.setDayMin(fac, date, sl.key, n === sl.min ? null : n);
+        return { key: sl.key, label: sl.label, time: sl.start + '–' + (U.toMin(sl.end) <= U.toMin(sl.start) ? '翌' : '') + sl.end, empty, short,
+          countText: `${mem.length}/${min}名`, countFg: short ? RED : '#1f72b8',
+          minNote: ovr ? '配置/最低（この日のみ）' : '配置/最低', minFg: ovr ? '#e0661a' : '#80858c',
+          minDec: () => setMin(Math.max(1, min - 1)), minInc: () => setMin(Math.min(5, min + 1)),
+          gapText: empty ? `欠員：最低${min}名の配置が必要です` : `あと${min - mem.length}名必要です（最低${min}名）`,
+          bd: over ? '#2b8fe0' : short ? RED_BD : '#e3e5e8', bg: over ? '#eaf4fd' : short ? RED_BG : 'transparent',
+          names: mem.map((s) => staffName(s.staffId).split(' ')[0] + (s.kind === 'custom' ? `(${this.lab(s)})` : '')).join('、') || '欠員', namesFg: short ? RED : '#333333',
+          onAdd: () => this.openSlot(sl.key),
+          members: mem.map((s) => { const partial = !U.covers(U.span(s), ss), x = this.vioOf(s);
+            return { name: staffName(s.staffId), hasTime: s.kind === 'custom', time: this.long(s), partial, ng: !!x, issueText: this.issueText(s), draft: s.status === 'draft',
+              title: x ? x.msg : partial ? `一部カバー（${this.long(s)}）— 最低人数の判定には含めます` : '',
+              bd: x ? RED : '#5a5f66', bg: x ? RED : '#5a5f66', fg: '#ffffff', op: dragSid === s.staffId ? 0.35 : 1, onDown: (e) => this.pressStart(s.staffId, e) }; }) };
+      });
+      const tray = db.staff.map((st) => {
+        const sh = dayShifts.find((s) => s.staffId === st.id), o = this.elsewhere(st.id, date, fac), b = this.badge(this.reqOf(st.id, date));
+        return { sid: st.id, name: st.name, badge: b.t, badgeCls: b.c, badgeBg: TC[b.c][0], badgeFg: TC[b.c][1],
+          assigned: sh ? '→ ' + this.lab(sh) : o ? `${o.facilityId} ${this.lab(o)}` : '未配置', assignFg: sh ? '#1f72b8' : o ? '#e0661a' : '#9a9ea5', isA: !!(sh || o),
+          op: dragSid === st.id ? 0.35 : sh || o ? 0.6 : 1, onDown: (e) => this.pressStart(st.id, e) };
+      }).sort((a, b) => a.isA - b.isA);
+      const ngN = dayShifts.filter((s) => this.vioOf(s)).length, shortN = slots.filter((s) => s.short).length, draftN = dayShifts.filter((s) => s.status === 'draft').length;
+      const stat = [shortN ? `欠員 ${shortN}枠` : '', ngN ? `NG ${ngN}件` : '', draftN ? `未確定 ${draftN}件` : ''].filter(Boolean).join(' · ') || '問題なし · 確定済み';
+      const optKeys = fslots.map((s) => s.key).concat(['custom', 'off']);
+      const people = variantB ? db.staff.map((st) => {
+        const sh = dayShifts.find((s) => s.staffId === st.id), o = this.elsewhere(st.id, date, fac), rq = this.reqOf(st.id, date), b = this.badge(rq), cur = sh ? sh.kind : 'off', x = sh && this.vioOf(sh);
+        return { name: st.name, badge: b.t, badgeCls: b.c, badgeBg: TC[b.c][0], badgeFg: TC[b.c][1], ng: !!x, issueText: sh ? this.issueText(sh) : '', bg: x ? RED_BG : 'transparent',
+          mismatch: !!sh && !!rq && !this.reqMatch(rq, cur) && rq.type !== 'custom' && !x, hasElse: !!o, elseText: o ? `${o.facilityId}で勤務 ${this.long(o)}` : '', optCols: cols(optKeys.length),
+          onDown: (e) => this.pressStart(st.id, e),
+          opts: optKeys.map((k, i) => { const on = cur === k, sl = this.slot(fac, k);
+            return { label: D.LABEL[k], sub: k === 'custom' && sh && sh.kind === 'custom' ? this.long(sh) : sl ? `${+sl.start.slice(0, 2)}-${+sl.end.slice(0, 2)}` : '',
+              bg: on ? (k === 'off' ? '#e3e5e8' : ON.bg) : 'transparent', fg: on && k !== 'off' ? ON.fg : '#333333',
+              bl: i ? '1px solid #e3e5e8' : '0', onClick: () => (k === 'custom' ? this.openPerson(st.id, 'custom') : this.assign(st.id, k === 'off' ? null : k)) }; }) };
+      }) : [];
+      Object.assign(v, {
+        isDaily: true, isDailyA: !variantB, isDailyB: variantB, showPhoneTray: isPhone && !variantB, slots, slotCols: cols(slots.length), tray, people, unCount: tray.filter((t) => !t.isA).length,
+        dailyCols: isDesktop ? 'minmax(0,1fr) 340px' : 'minmax(0,1fr)',
+        trayBg: S.over === 'tray' ? '#eaf4fd' : '#ffffff', trayBd: S.over === 'tray' ? '#2b8fe0' : '#e3e5e8',
+        dayTitle: `11月${S.day}日（${DOW[U.dow(S.day)]}）`, dayStat: fac + ' · ' + stat, dayStatFg: shortN || ngN ? RED : '#80858c',
+        prevDis: S.day <= 1, nextDis: S.day >= 30,
+        onPrev: () => this.setState((s) => ({ day: Math.max(1, s.day - 1) })), onNext: () => this.setState((s) => ({ day: Math.min(30, s.day + 1) })),
+        dragHint: isDesktop ? 'カードをドラッグで枠へ／クリックで時刻編集' : variantB ? '名前を長押しで上の枠へドラッグも可' : 'カードを長押しでドラッグ／タップで編集',
+      });
+    }
+
+    // ── 管理者：スタッフ・人件費 ──
+    if (admin && tab === 'cost') {
+      const set = full.settings, calc = (st) => D.payroll(st, full.shifts, set);
+      let tp = 0, tt = 0, tm = 0;
+      const rows = allMode ? [] : db.staff.map((st) => {
+        const r = calc(st), per = st.transportType === 'per_shift', primary = st.facilityIds[0] === fac;
+        if (primary) { tp += r.pay; tt += r.transport; tm += r.workMin; }
+        const a = this.adoption(st.id), pct = Math.round(a.rate * 100), sub = full.submissions.find((s) => s.staffId === st.id) || {};
+        const ext = sub.extendedUntil, capped = per && st.transportAmount > r.cap.cap;
+        return {
+          name: st.name, days: r.days, hours: (r.workMin / 60).toFixed(1) + 'h',
+          facText: st.facilityIds.map((f, i) => (i === 0 ? f + '（主）' : f)).join('・'),
+          costNote: !primary ? `人件費は${st.facilityIds[0]}に計上` : st.facilityIds.length > 1 ? '兼任先での勤務分も含めて計上' : '',
+          subText: sub.submittedAt ? `提出済 ${this.fmt(sub.submittedAt)}` : '未提出', subFg: sub.submittedAt ? '#1f72b8' : RED,
+          extText: ext ? `延長中：${this.fmt(ext)}まで` : !sub.submittedAt && D.TODAY > D.DEADLINE ? '期限切れ' : '',
+          extLabel: ext ? '延長を取り消す' : '期限を延長',
+          onExt: () => D.repo.extendDeadline(st.id, ext ? null : EXT_TO).then(() => this.flash(ext ? '延長を取り消しました' : `${st.name}さんの期限を${this.fmt(EXT_TO)}まで延長し、メールで通知しました`)),
+          tenureText: `勤続${r.cap.monthIdx}か月目 · 累計${r.cap.cum}日 → 交通費上限 ${yen(r.cap.cap)}/日`,
+          capNote: capped ? `実費 ${yen(st.transportAmount)} → 上限 ${yen(r.cap.cap)} で計算` : '',
+          rate: a.want ? pct + '%' : '—', rateSub: `${a.hit}／${a.want}日`, rateFg: !a.want ? '#80858c' : pct < 60 ? RED : '#1f72b8',
+          rateW: (a.want ? (a.hit / a.want) * 100 : 0) + '%', otherW: (a.want ? (a.other / a.want) * 100 : 0) + '%', offWork: a.offWork, hasOffWork: a.offWork > 0,
+          rateNote: `希望どおり ${a.hit}日 · 別の枠・時刻で出勤 ${a.other}日 · 不採用 ${a.want - a.hit - a.other}日`,
+          wage: st.hourlyWage, amt: st.transportAmount, amtLabel: per ? '実費／1出勤' : '月額（円）',
+          perBg: per ? ON.bg : OFF.bg, perFg: per ? ON.fg : OFF.fg, monBg: per ? OFF.bg : ON.bg, monFg: per ? OFF.fg : ON.fg,
+          onPer: () => D.repo.updateStaff(st.id, { transportType: 'per_shift' }), onMon: () => D.repo.updateStaff(st.id, { transportType: 'monthly' }),
+          onWage: (e) => D.repo.updateStaff(st.id, { hourlyWage: Math.max(0, +e.target.value || 0) }), onAmt: (e) => D.repo.updateStaff(st.id, { transportAmount: Math.max(0, +e.target.value || 0) }),
+          pay: yen(r.pay), transport: yen(r.transport), total: yen(r.total) };
+      });
+      const facCost = allMode ? D.FACILITIES.map((f) => {
+        const ps = full.staff.filter((st) => st.facilityIds[0] === f.id); let p = 0, t = 0, m = 0, aw = 0, ah = 0;
+        ps.forEach((st) => { const r = calc(st), a = this.adoption(st.id); p += r.pay; t += r.transport; m += r.workMin; aw += a.want; ah += a.hit; });
+        tp += p; tt += t; tm += m;
+        return { code: f.id, staffN: ps.length, hours: (m / 60).toFixed(1) + 'h', pay: yen(p), transport: yen(t), total: yen(p + t),
+          rate: aw ? Math.round((ah / aw) * 100) + '%' : '—', rateSub: `${ah}／${aw}日`, onClick: () => goFac(f.id, 'cost') };
+      }) : [];
+      const tg = (key, label, sub) => { const on = !!set[key];
+        return { label, sub, on: String(on), bg: on ? '#2b8fe0' : '#f0f1f3', bd: on ? '#2b8fe0' : '#e3e5e8', knob: on ? '24px' : '3px', knobBg: on ? '#ffffff' : '#9a9ea5', onClick: () => D.repo.updateSettings({ [key]: !on }) }; };
+      Object.assign(v, { isCost: true, costRows: rows, costFac: allMode, costStaff: !allMode, facCost, facName: fac,
+        costSlots: fslots.map((sl) => ({ label: sl.label, time: sl.start + '–' + (U.toMin(sl.end) <= U.toMin(sl.start) ? '翌' : '') + sl.end, min: sl.min,
+          dec: () => D.repo.setSlotMin(fac, sl.key, Math.max(1, sl.min - 1)), inc: () => D.repo.setSlotMin(fac, sl.key, Math.min(5, sl.min + 1)) })),
+        costKicker: allMode ? '全施設 · 人件費・希望採用率 · 管理者のみ表示' : `${fac} · スタッフ設定・人件費・希望採用率 · 管理者のみ表示`,
+        costTotal: yen(tp + tt), costBreak: (allMode ? '5施設合計 · ' : '主な所属スタッフ分（兼任先の勤務を含む） · ') + `給与見込み ${yen(tp)} · 交通費 ${yen(tt)} · 総勤務 ${(tm / 60).toFixed(1)}h`,
+        toggles: [tg('breakDeduction', '休憩時間を差し引く', '日勤：6時間以上45分・8時間以上60分／夜勤：3時間'), tg('nightPremium', '深夜割増を含める', '22:00〜5:00 の勤務に +25%')] });
+    }
+
+    // ── 管理者：変更履歴 ──
+    if (admin && tab === 'log') {
+      const CAT = { shift: ['シフト', '#eaf4fd', '#1f72b8'], confirm: ['確定', '#e6f6ec', '#1d7a46'], setting: ['設定', '#fdf0e6', '#b4500f'], request: ['希望', '#f0f1f3', '#5f646b'] };
+      const inFac = full.history.filter((h) => allMode || h.facilityId === fac || (!h.facilityId && h.staffId && (full.staff.find((s) => s.id === h.staffId) || { facilityIds: [] }).facilityIds.includes(fac)) || (!h.facilityId && !h.staffId));
+      const byAt = (a, b) => new Date(b.at) - new Date(a.at);
+      const rows = inFac.filter((h) => (S.logCat === 'all' || h.category === S.logCat) && (!S.logActor || h.actor === S.logActor)).sort(byAt);
+      const chip = (on) => ({ bg: on ? '#2b8fe0' : '#ffffff', fg: on ? '#ffffff' : '#333333', bd: on ? '#2b8fe0' : '#d5d8dc' });
+      const actors = [...new Set(inFac.map((h) => h.actor))].filter((a) => a.includes('管理者'));
+      Object.assign(v, { isLog: true, logEmpty: !rows.length, logCols: isPhone ? '84px minmax(0,1fr)' : '120px minmax(0,1fr)',
+        logKicker: `${allMode ? '全施設' : fac} · 誰がいつ何を変えたか · 管理者のみ表示`, logCount: `${rows.length}件`,
+        logFilters: [['all', 'すべて'], ['shift', 'シフト'], ['confirm', '確定'], ['setting', '設定'], ['request', '希望提出']].map(([k, l]) => ({ label: l, ...chip(S.logCat === k), onClick: () => this.setState({ logCat: k }) })),
+        logActors: actors.map((a) => ({ label: a, ...chip(S.logActor === a), onClick: () => this.setState((s) => ({ logActor: s.logActor === a ? null : a })) })),
+        logRows: rows.map((h) => { const c = CAT[h.category];
+          return { at: this.hAt(h.at), actor: h.actor, cat: c[0], tagBg: c[1], tagFg: c[2], action: h.action, target: this.hTarget(h), hasBefore: !!h.before, before: h.before || '', after: h.after || '' }; }) });
+    }
+
+    // ── シート ──
+    const sh = S.sheet;
+    if (sh && sh.type === 'confirm') {
+      Object.assign(v, { sheetOpen: true, sheetJustify: isPhone ? 'flex-end' : 'center', sheetMax: isPhone ? '100%' : '440px', isConfirmSheet: true, isChoiceSheet: false, isSlotSheet: false, showTime: false,
+        sheetHasBadge: false, sheetInfo: false, sheetWarn: false, canClear: false, sheetHasLog: false,
+        sheetKicker: '提出前の確認', sheetTitle: `空欄が ${sh.blanks.length}日 あります`,
+        cfText: '空欄の日は「希望なし」として提出されます。勤務の可否は管理者が判断し、休みになる場合もあります。このまま提出してよいですか？',
+        cfDays: sh.blanks.map((d) => { const w = U.dow(d); return { t: `${d}日（${DOW[w]}）`, fg: w === 0 ? RED : w === 6 ? '#1f72b8' : '#333333', onClick: () => this.openReq(d) }; }),
+        cfSubmit: () => this.submitReq() });
+    }
+    if (sh && sh.type !== 'confirm') {
+      const isReqS = sh.type === 'req', isPer = sh.type === 'person', isSlot = sh.type === 'slot', date = isReqS ? sh.date : this.dk(), d = U.dayOf(date);
+      const optKeys = isReqS ? this.reqKeys(me).concat(['custom', 'off']) : fslots.map((s) => s.key).concat(['custom', 'off']);
+      const slotFor = (k) => (isReqS ? me.facilityIds.map((f) => this.slot(f, k)).find(Boolean) : this.slot(fac, k));
+      const showTime = !isSlot && sh.choice === 'custom';
+      const pick = (k) => {
+        if (k === 'custom') return this.patchSheet({ choice: 'custom' });
+        if (isReqS) return this.setDraft(sh.date, { type: k });
+        this.assign(sh.sid, k === 'off' ? null : k); this.setState({ sheet: null });
+      };
+      Object.assign(v, { sheetOpen: true, sheetJustify: isPhone ? 'flex-end' : 'center', sheetMax: isPhone ? '100%' : '440px', isChoiceSheet: !isSlot, isSlotSheet: isSlot, showTime,
+        sheetHasBadge: false, sheetInfo: false, sheetWarn: false, canClear: false, sheetCols: cols(optKeys.length) });
+      if (!isSlot) v.sheetOpts = optKeys.map((k, i) => { const on = sh.choice === k, sl = slotFor(k);
+        return { label: k === 'custom' ? '時間指定' : k === 'off' && isPer ? '外す' : D.LABEL[k], sub: k === 'both' ? 'どちらも可' : sl ? `${+sl.start.slice(0, 2)}-${+sl.end.slice(0, 2)}` : '', bl: i ? '1px solid #e3e5e8' : '0',
+          bg: on ? ON.bg : 'transparent', fg: on ? ON.fg : '#333333', onClick: () => pick(k) }; });
+      if (isReqS) Object.assign(v, { sheetKicker: '希望を選択（施設は管理者が決めます）', sheetTitle: `11月${d}日（${DOW[U.dow(d)]}）`, canClear: !!S.draft[date], clearLabel: 'クリア', onClear: () => this.setDraft(date, null) });
+      if (isPer) {
+        const b = this.badge(this.reqOf(sh.sid, date)), cur = this.shiftAt(sh.sid, date, fac), o = this.elsewhere(sh.sid, date, fac);
+        const sl = this.slot(fac, sh.choice), cand = sh.choice === 'custom' ? { start: sh.start, end: sh.end } : sl || null;
+        const warn = D.checkCandidate(full, sh.sid, date, fac, cand);
+        Object.assign(v, { sheetKicker: `${fac} · 11月${d}日 · ${cur ? '現在 ' + this.lab(cur) : '未配置'}`, sheetTitle: staffName(sh.sid), sheetHasBadge: true, sheetBadge: b.t, sheetBadgeBg: TC[b.c][0], sheetBadgeFg: TC[b.c][1],
+          sheetInfo: !!o, sheetInfoText: o ? `この日は ${o.facilityId} ${this.long(o)} にも配置されています` : '', sheetWarn: !!warn, sheetWarnText: warn });
+        const hl = full.history.filter((h) => h.category === 'shift' && h.staffId === sh.sid && h.date === date && h.facilityId === fac).sort((a, b) => new Date(b.at) - new Date(a.at));
+        Object.assign(v, { sheetHasLog: true, sheetLogEmpty: !hl.length,
+          sheetLog: hl.map((h) => ({ at: this.hAt(h.at), actor: h.actor, change: `${h.before || '未配置'} → ${h.after}` })),
+          openLog: () => this.setState((s) => ({ sheet: null, logCat: 'shift', logActor: null, tabs: { ...s.tabs, admin: 'log' } })) });
+      }
+      if (isSlot) {
+        const sl = this.slot(fac, sh.key), ss = U.span(sl);
+        v.cands = db.staff.filter((st) => { const s = this.shiftAt(st.id, date, fac); return !s || !U.overlap(U.span(s), ss); })
+          .map((st) => { const rq = this.reqOf(st.id, date), b = this.badge(rq), s = this.shiftAt(st.id, date, fac), o = this.elsewhere(st.id, date, fac);
+            return { name: st.name, badge: b.t, badgeBg: TC[b.c][0], badgeFg: TC[b.c][1], cur: s ? '現在 ' + this.lab(s) : o ? `${o.facilityId} ${this.lab(o)}` : '未配置',
+              curFg: s ? '#1f72b8' : o ? '#e0661a' : '#9a9ea5', m: rq && this.reqMatch(rq, sh.key) && !o ? 0 : s || o ? 2 : 1,
+              onClick: () => { this.assign(st.id, sh.key); this.setState({ sheet: null }); } }; }).sort((a, b) => a.m - b.m);
+        Object.assign(v, { sheetKicker: `${fac} · 11月${d}日 · ${sl.start}–${U.toMin(sl.end) <= U.toMin(sl.start) ? '翌' : ''}${sl.end}`, sheetTitle: `${sl.label}の枠に追加` });
+      }
+      if (showTime) {
+        const sp = U.span({ start: sh.start, end: sh.end }), dur = sp[1] - sp[0];
+        const cov = isReqS ? [] : fslots.filter((x) => U.overlap(sp, U.span(x))).map((x) => x.label + (U.covers(sp, U.span(x)) ? '' : '（一部カバー）'));
+        Object.assign(v, { tStart: sh.start, tEnd: sh.end, startOpts: this.timeOpts(S.step, sh.start, null), endOpts: this.timeOpts(S.step, sh.end, sh.start),
+          onStart: (e) => this.patchSheet({ start: e.target.value }), onEnd: (e) => this.patchSheet({ end: e.target.value }),
+          s15Bg: S.step === 15 ? ON.bg : OFF.bg, s15Fg: S.step === 15 ? ON.fg : OFF.fg, s30Bg: S.step === 30 ? ON.bg : OFF.bg, s30Fg: S.step === 30 ? ON.fg : OFF.fg,
+          step15: () => this.setState({ step: 15 }), step30: () => this.setState({ step: 30 }),
+          tSummary: `${Math.floor(dur / 60)}時間${String(dur % 60).padStart(2, '0')}分${U.toMin(sh.end) <= U.toMin(sh.start) ? ' · 日をまたぐ' : ''}`,
+          tCover: isReqS ? '' : cov.length ? `表示する枠：${cov.join('・')}` : '標準枠と重なりません',
+          onConfirmTime: () => { if (isReqS) this.setDraft(sh.date, { type: 'custom', start: sh.start, end: sh.end }); else { this.assign(sh.sid, 'custom', sh.start, sh.end); this.setState({ sheet: null }); } } });
+      }
+    }
+
+    if (S.drag) {
+      const sl = S.over && S.over !== 'tray' ? this.slot(fac, S.over) : null;
+      Object.assign(v, { dragging: true, ghostX: S.drag.x, ghostY: S.drag.y, ghostName: staffName(S.drag.sid), ghostTarget: S.over === 'tray' ? '外す' : sl ? sl.label + 'の枠' : '…' });
+    }
+    return v;
+  }
+}
+</script>
+</body>
+</html>

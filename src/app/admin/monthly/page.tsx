@@ -1,36 +1,26 @@
-import { fetchMonthData } from '@/app/actions/shifts'
+import { fetchMonthBoard } from '@/app/actions/board'
 import { MonthlyClient } from './MonthlyClient'
-import { todayJST } from '@/lib/utils'
 
 export default async function MonthlyPage({
   searchParams,
 }: {
-  searchParams: { year?: string; month?: string }
+  searchParams: { facility?: string; month?: string }
 }) {
-  const [ty, tm] = todayJST().split('-').map(Number)
-  const qy = parseInt(searchParams.year  ?? '')
-  const qm = parseInt(searchParams.month ?? '')
-  const year  = Number.isFinite(qy) ? qy : ty
-  const month = Number.isFinite(qm) && qm >= 1 && qm <= 12 ? qm : tm
+  const month    = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : '2026-12'
+  const facility = searchParams.facility ?? 'all'
 
-  const { assignments, error } = await fetchMonthData(year, month)
+  const board = await fetchMonthBoard(month)
 
-  if (error) {
+  if (board.error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white border border-red-200 rounded-xl p-6 text-red-700 text-sm max-w-md">
+      <div className="p-6">
+        <div className="bg-hs-danger-bg border border-hs-danger-border rounded-card p-4 text-sm text-hs-danger">
           <p className="font-medium mb-1">データ取得エラー</p>
-          <p>{error}</p>
+          <p>{board.error}</p>
         </div>
       </div>
     )
   }
 
-  return (
-    <MonthlyClient
-      initialYear={year}
-      initialMonth={month}
-      initialAssignments={assignments}
-    />
-  )
+  return <MonthlyClient board={board} facility={facility} />
 }

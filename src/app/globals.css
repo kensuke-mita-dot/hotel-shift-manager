@@ -54,6 +54,17 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-hs-gray-lighter text-hs-text;
+    font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
+}
+
+/* スクロールバー非表示（施設タブ等の横スクロール） */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

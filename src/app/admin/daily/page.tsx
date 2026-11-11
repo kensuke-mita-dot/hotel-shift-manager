@@ -1,33 +1,28 @@
-import { todayJST } from '@/lib/utils'
-import { fetchDayData } from '@/app/actions/shifts'
-import { DailyAdjustClient } from './DailyAdjustClient'
+import { fetchDayBoard } from '@/app/actions/board'
+import { DailyClient } from './DailyClient'
 
-export default async function DailyAdjustPage({
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+export default async function DailyPage({
   searchParams,
 }: {
-  searchParams: { date?: string }
+  searchParams: { facility?: string; date?: string }
 }) {
-  const today   = todayJST()
-  const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date ?? '') ? searchParams.date! : today
+  const date     = DATE.test(searchParams.date ?? '') ? searchParams.date! : '2026-12-01'
+  const facility = searchParams.facility ?? 'all'
 
-  const { pool, assignment, error } = await fetchDayData(dateStr)
+  const board = await fetchDayBoard(date)
 
-  if (error) {
+  if (board.error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white border border-red-200 rounded-xl p-6 text-red-700 text-sm max-w-md">
+      <div className="p-6">
+        <div className="bg-hs-danger-bg border border-hs-danger-border rounded-card p-4 text-sm text-hs-danger">
           <p className="font-medium mb-1">データ取得エラー</p>
-          <p>{error}</p>
+          <p>{board.error}</p>
         </div>
       </div>
     )
   }
 
-  return (
-    <DailyAdjustClient
-      initialDate={dateStr}
-      initialPool={pool}
-      initialAssignment={assignment}
-    />
-  )
+  return <DailyClient board={board} facility={facility} />
 }
