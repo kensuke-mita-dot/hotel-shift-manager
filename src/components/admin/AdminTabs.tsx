@@ -24,11 +24,13 @@ function AdminTabsInner() {
   const isDaily   = pathname.startsWith('/admin/daily')
   const isMonthly = pathname.startsWith('/admin/monthly')
   const isStaff   = pathname.startsWith('/admin/staff')
+  const isCost    = pathname.startsWith('/admin/cost')
 
   // タブリンク（施設パラメータを引き継ぐ）
   const dailyHref   = `/admin/daily?facility=${facility}&date=${date}`
   const monthlyHref = `/admin/monthly?facility=${facility}&month=${month}`
   const staffHref   = '/admin/staff'
+  const costHref    = `/admin/cost?month=${month}`
 
   // 施設切り替えリンク（ページ・日付・月を引き継ぐ）
   const facilityHref = (param: string) => {
@@ -45,6 +47,7 @@ function AdminTabsInner() {
       <div className="flex px-2">
         <TabLink href={dailyHref}   active={isDaily}>日次調整</TabLink>
         <TabLink href={monthlyHref} active={isMonthly}>月間</TabLink>
+        <TabLink href={costHref}    active={isCost}>人件費</TabLink>
         <TabLink href={staffHref}   active={isStaff}>スタッフ</TabLink>
       </div>
 

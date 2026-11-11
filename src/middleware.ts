@@ -74,12 +74,20 @@ export async function middleware(request: NextRequest) {
 
   // ── 管理者ルートのロールチェック ─────────────────────────────────
   if (pathname.startsWith('/admin') && dest !== '/admin/daily') {
-    return NextResponse.redirect(new URL('/staff/requests', request.url))
+    return NextResponse.redirect(new URL('/staff/schedule', request.url))
   }
 
-  // ── スタッフが管理者ルートに来た場合も弾く ────────────────────────
-  if (pathname.startsWith('/staff') && dest === '/admin/daily') {
-    // 管理者がスタッフ画面に来た場合は通す（確認用途として許可）
+  // ── 初期PIN・再発行PINのままならPIN変更を先に求める ───────────────
+  // （管理者がスタッフ画面を確認用に開くのは許可）
+  if (pathname.startsWith('/staff') && pathname !== '/staff/pin' && dest !== '/admin/daily') {
+    const { data } = await supabase
+      .from('profiles')
+      .select('must_change_pin')
+      .eq('id', user.id)
+      .single()
+    if (data?.must_change_pin) {
+      return NextResponse.redirect(new URL('/staff/pin', request.url))
+    }
   }
 
   return supabaseResponse
@@ -88,7 +96,7 @@ export async function middleware(request: NextRequest) {
 async function getDestination(
   supabase: ReturnType<typeof createServerClient>,
   userId: string
-): Promise<'/admin/daily' | '/staff/requests' | 'inactive'> {
+): Promise<'/admin/daily' | '/staff/schedule' | 'inactive'> {
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, is_active')
@@ -96,7 +104,7 @@ async function getDestination(
     .single()
 
   if (!profile?.is_active) return 'inactive'
-  return profile?.role === 'admin' ? '/admin/daily' : '/staff/requests'
+  return profile?.role === 'admin' ? '/admin/daily' : '/staff/schedule'
 }
 
 export const config = {

@@ -9,7 +9,7 @@ export interface ShiftEntry {
   staff_id: string
   facility_id: string
   date: string        // 'YYYY-MM-DD'（開始日）
-  kind: string        // 'morning' | 'evening' | 'night' | 'base' | 'custom'
+  kind: string        // 'morning' | 'evening' | 'night' | 'base' | 'both'（朝夕通し）| 'custom'（浮き）
   start_time: string  // 'HH:MM:SS'
   end_time: string    // 'HH:MM:SS'（翌日終了のとき end < start）
   starts_at: string   // 'YYYY-MM-DD HH:MM:SS'（DB の生成列）
@@ -46,9 +46,17 @@ export interface Violation {
 
 const INTERVAL_MINUTES = 8 * 60  // 8時間
 
-/** 'YYYY-MM-DD HH:MM:SS' → 分（epoch からの差分） */
+/** 'YYYY-MM-DD HH:MM:SS' / 'YYYY-MM-DDTHH:MM:SS' → 分（タイムゾーンに依存しない） */
 function toMin(ts: string): number {
-  return new Date(ts.replace(' ', 'T')).getTime() / 60000
+  const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/)
+  if (!m) return NaN
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 60000
+}
+
+/** その枠の人数に数えるシフトか（朝夕通しは朝枠・夕枠の両方に数える。浮きは数えない） */
+export function coversSlot(kind: string, slotKey: string): boolean {
+  if (kind === slotKey) return true
+  return kind === 'both' && (slotKey === 'morning' || slotKey === 'evening')
 }
 
 // ─── インターバルチェック ─────────────────────────────────────
@@ -146,7 +154,7 @@ export function checkUnderstaffed(
   )
 
   for (const slot of facilitySlots) {
-    const matched = dayShifts.filter(s => s.kind === slot.key)
+    const matched = dayShifts.filter(s => coversSlot(s.kind, slot.key))
     if (matched.length < slot.min_staff) {
       violations.push({
         type: 'understaffed',
@@ -178,8 +186,8 @@ export function checkBothCoverage(
     const dayShifts = shifts.filter(
       s => s.staff_id === req.staff_id && s.date === req.date
     )
-    const hasMorning = dayShifts.some(s => s.kind === 'morning')
-    const hasEvening = dayShifts.some(s => s.kind === 'evening')
+    const hasMorning = dayShifts.some(s => coversSlot(s.kind, 'morning'))
+    const hasEvening = dayShifts.some(s => coversSlot(s.kind, 'evening'))
 
     if (hasMorning && hasEvening) continue  // OK
 

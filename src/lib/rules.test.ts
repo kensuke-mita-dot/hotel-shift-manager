@@ -322,3 +322,24 @@ describe('runAllChecks', () => {
     expect(v).toHaveLength(0)
   })
 })
+
+// ─── 朝夕通し（kind = 'both'）─────────────────────────────────
+describe('朝夕通し', () => {
+  const slots: SlotDef[] = [
+    { facility_id: 'BHJ', key: 'morning', start_time: '08:00:00', end_time: '16:00:00', min_staff: 1 },
+    { facility_id: 'BHJ', key: 'evening', start_time: '14:00:00', end_time: '22:00:00', min_staff: 1 },
+  ]
+  it('朝枠・夕枠の両方の人数に数える', () => {
+    const shifts = [makeShift('a', 'BHJ', '2026-12-01', '08:00', '22:00', 'both')]
+    expect(checkUnderstaffed(shifts, slots, 'BHJ', '2026-12-01')).toHaveLength(0)
+  })
+  it('朝夕希望を満たす', () => {
+    const shifts = [makeShift('a', 'BHJ', '2026-12-01', '08:00', '22:00', 'both')]
+    const reqs: RequestEntry[] = [{ staff_id: 'a', date: '2026-12-01', type: 'both' }]
+    expect(checkBothCoverage(reqs, shifts)).toHaveLength(0)
+  })
+  it('浮きは枠の人数に数えない', () => {
+    const shifts = [makeShift('a', 'BHJ', '2026-12-01', '10:00', '15:00', 'custom')]
+    expect(checkUnderstaffed(shifts, slots, 'BHJ', '2026-12-01')).toHaveLength(2)
+  })
+})

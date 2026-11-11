@@ -7,11 +7,13 @@ export function StaffTabs() {
   const pathname = usePathname()
   const isRequests = pathname.startsWith('/staff/requests')
   const isSchedule = pathname.startsWith('/staff/schedule')
+  const isPin      = pathname.startsWith('/staff/pin')
 
   return (
     <div className="sticky top-14 z-20 bg-white border-b border-hs-border flex px-2">
-      <TabLink href="/staff/requests" active={isRequests}>希望入力</TabLink>
       <TabLink href="/staff/schedule" active={isSchedule}>確定シフト</TabLink>
+      <TabLink href="/staff/requests" active={isRequests}>希望入力</TabLink>
+      <TabLink href="/staff/pin"      active={isPin}>PIN変更</TabLink>
     </div>
   )
 }

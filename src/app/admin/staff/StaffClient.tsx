@@ -1,17 +1,21 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { ShieldCheck, User } from 'lucide-react'
+import { Fragment, useState, useTransition } from 'react'
+import { ShieldCheck, User, KeyRound, Pencil, Copy, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  inviteStaff,
+  createStaff,
+  resetPin,
+  updateStaffSettings,
   extendDeadline,
   setStaffActive,
   setIsStaff,
   updateRole,
   fetchStaffList,
   type StaffListItem,
+  type StaffPayInfo,
 } from '@/app/actions/staff'
+import { yen } from '@/lib/utils'
 import type { Facility, UserRole } from '@/types'
 
 const AVATAR_COLORS = [
@@ -54,12 +58,16 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
   const [showInvite, setShowInvite] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  // 招待フォーム
+  // 追加フォーム
   const [invName, setInvName] = useState('')
-  const [invEmail, setInvEmail] = useState('')
   const [invFacilities, setInvFacilities] = useState<string[]>([])
   const [invPrimary, setInvPrimary] = useState('')
   const [inviting, setInviting] = useState(false)
+
+  // 発行直後のログイン情報（この画面を離れると二度と表示されない）
+  const [issued, setIssued] = useState<{ name: string; loginId: string; pin: string; isReset: boolean } | null>(null)
+  // 所属・時給の編集中の行
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   // 期限延長
   const [extendingId, setExtendingId] = useState<string | null>(null)
@@ -83,19 +91,43 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
     .filter(s => s.isActive && !s.submittedAt && (s.role === 'staff' || s.isStaff))
     .length
 
-  // ─── 招待 ───────────────────────────────────────────────────────
+  // ─── スタッフ追加（ID＋PIN発行）───────────────────────────────
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!invName || !invEmail) return
+    if (!invName.trim()) return
     if (invFacilities.length === 0) { toast.error('所属施設を選択してください'); return }
     if (!invPrimary) { toast.error('主な所属を選択してください'); return }
     setInviting(true)
-    const result = await inviteStaff(invEmail, invName, invFacilities, invPrimary)
+    const result = await createStaff({ fullName: invName, facilityIds: invFacilities, primaryFacilityId: invPrimary })
     setInviting(false)
-    if (result.error) { toast.error(`招待失敗: ${result.error}`); return }
-    toast.success(`${invName} に招待メールを送信しました`)
-    setInvName(''); setInvEmail(''); setInvFacilities([]); setInvPrimary('')
+    if (result.error || !result.loginId || !result.pin) { toast.error(`追加に失敗: ${result.error ?? '不明なエラー'}`); return }
+    setIssued({ name: invName.trim(), loginId: result.loginId, pin: result.pin, isReset: false })
+    setInvName(''); setInvFacilities([]); setInvPrimary('')
     setShowInvite(false)
+    refresh()
+  }
+
+  // ─── PIN再発行 ─────────────────────────────────────────────────
+  const handleResetPin = (member: StaffListItem) => {
+    if (!member.loginId) return
+    if (!confirm(`${member.fullName} のPINを再発行しますか？今のPINは使えなくなります。`)) return
+    startTransition(async () => {
+      const result = await resetPin(member.id)
+      if (result.error || !result.pin) { toast.error(`再発行に失敗: ${result.error ?? '不明なエラー'}`); return }
+      setIssued({ name: member.fullName, loginId: member.loginId!, pin: result.pin, isReset: true })
+      refresh()
+    })
+  }
+
+  // ─── 所属・時給の保存 ─────────────────────────────────────────
+  const handleSaveSettings = async (
+    member: StaffListItem,
+    settings: { facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo },
+  ) => {
+    const result = await updateStaffSettings(member.id, settings)
+    if (result.error) { toast.error(`保存に失敗: ${result.error}`); return }
+    toast.success(`${member.fullName} の設定を保存しました`)
+    setEditingId(null)
     refresh()
   }
 
@@ -177,17 +209,25 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
             onClick={() => setShowInvite(v => !v)}
             className="shrink-0 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
-            + スタッフを招待
+            + スタッフを追加
           </button>
         </div>
 
-        {/* ── 招待フォーム ── */}
+        {/* ── 発行したログイン情報 ── */}
+        {issued && <IssuedCard issued={issued} onClose={() => setIssued(null)} />}
+
+        {/* ── 追加フォーム ── */}
         {showInvite && (
           <form
             onSubmit={handleInvite}
             className="bg-white border border-blue-200 rounded-xl p-5 space-y-4"
           >
-            <p className="text-sm font-medium text-gray-800">新しいスタッフを招待</p>
+            <div>
+              <p className="text-sm font-medium text-gray-800">新しいスタッフを追加</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                メールアドレスは不要です。追加するとログインIDと初期PINが表示されるので、本人に渡してください。
+              </p>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -197,17 +237,6 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                   value={invName}
                   onChange={e => setInvName(e.target.value)}
                   placeholder="田中 花子"
-                  required
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">メールアドレス *</label>
-                <input
-                  type="email"
-                  value={invEmail}
-                  onChange={e => setInvEmail(e.target.value)}
-                  placeholder="tanaka@example.com"
                   required
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -270,7 +299,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                 disabled={inviting}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
-                {inviting ? '送信中...' : '招待メールを送る'}
+                {inviting ? '追加中...' : '追加してIDを発行'}
               </button>
             </div>
           </form>
@@ -318,7 +347,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">名前</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">所属施設</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">所属施設・時給</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">12月の提出状況</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">期限延長</th>
                 <th className="px-4 py-3" />
@@ -326,8 +355,8 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
             </thead>
             <tbody>
               {filtered.map(member => (
+                <Fragment key={member.id}>
                 <tr
-                  key={member.id}
                   className={`border-b border-gray-50 transition-colors
                     ${!member.isActive ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'}`}
                 >
@@ -342,7 +371,24 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                       </div>
                       <div>
                         <div className="font-medium text-gray-800">{member.fullName}</div>
-                        <div className="text-xs text-gray-400">{member.email}</div>
+                        {member.loginId ? (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <span className="font-mono">{member.loginId}</span>
+                            {member.mustChangePin && (
+                              <span className="px-1 rounded bg-orange-100 text-orange-700 text-[10px]" title="初期PIN・再発行PINのまま">PIN未変更</span>
+                            )}
+                            <button
+                              onClick={() => handleResetPin(member)}
+                              disabled={isPending}
+                              className="text-gray-400 hover:text-gray-800"
+                              title="PINを再発行"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-400">{member.email}</div>
+                        )}
                         {!member.isActive && (
                           <div className="text-xs text-red-400 mt-0.5">停止中</div>
                         )}
@@ -368,6 +414,22 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                         <span className="text-gray-400 text-xs">未設定</span>
                       )}
                     </div>
+                    <button
+                      onClick={() => setEditingId(id => id === member.id ? null : member.id)}
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900"
+                      title="所属施設・時給・交通費を編集"
+                    >
+                      <span className={member.pay.hourlyWage === 0 ? 'text-orange-600' : ''}>
+                        {member.pay.hourlyWage === 0 ? '時給未設定' : `${yen(member.pay.hourlyWage)}/h`}
+                      </span>
+                      <span className="text-gray-300">·</span>
+                      <span>
+                        {member.pay.transportAmount === 0
+                          ? '交通費なし'
+                          : `${member.pay.transportType === 'monthly' ? '月' : '1出勤'}${yen(member.pay.transportAmount)}`}
+                      </span>
+                      <Pencil className="w-3 h-3" />
+                    </button>
                   </td>
 
                   {/* 提出状況 */}
@@ -440,9 +502,8 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
 
                   {/* 操作 */}
                   <td className="px-4 py-3 text-right">
-                    {member.id !== currentUserId && (
                       <div className="flex items-center justify-end gap-2">
-                        {/* 管理者のみ：シフトに入るトグル */}
+                        {/* 管理者のみ：シフトに入るトグル（自分自身も可） */}
                         {member.role === 'admin' && (
                           <label className="flex items-center gap-1 cursor-pointer text-xs text-gray-500 hover:text-gray-700">
                             <input
@@ -455,6 +516,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                             <span>シフト入る</span>
                           </label>
                         )}
+                        {member.id !== currentUserId && (<>
                         <button
                           onClick={() => handleRoleToggle(member)}
                           disabled={isPending}
@@ -477,10 +539,23 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                         >
                           {member.isActive ? '停止' : '復帰'}
                         </button>
+                        </>)}
                       </div>
-                    )}
                   </td>
                 </tr>
+                {editingId === member.id && (
+                  <tr className="border-b border-gray-100 bg-gray-50/70">
+                    <td colSpan={5} className="px-4 py-4">
+                      <SettingsEditor
+                        member={member}
+                        facilities={facilities}
+                        onCancel={() => setEditingId(null)}
+                        onSave={settings => handleSaveSettings(member, settings)}
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
               {filtered.length === 0 && (
                 <tr>
@@ -493,6 +568,149 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
           </table>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── 所属施設・時給・交通費の編集 ─────────────────────────────
+function SettingsEditor({
+  member, facilities, onCancel, onSave,
+}: {
+  member: StaffListItem
+  facilities: Facility[]
+  onCancel: () => void
+  onSave: (s: { facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo }) => Promise<void>
+}) {
+  const [facIds, setFacIds]   = useState<string[]>(member.facilities.map(f => f.facilityId))
+  const [primary, setPrimary] = useState<string>(member.facilities.find(f => f.isPrimary)?.facilityId ?? '')
+  const [wage, setWage]       = useState(member.pay.hourlyWage ? String(member.pay.hourlyWage) : '')
+  const [tType, setTType]     = useState<StaffPayInfo['transportType']>(member.pay.transportType)
+  const [tAmount, setTAmount] = useState(member.pay.transportAmount ? String(member.pay.transportAmount) : '')
+  const [saving, setSaving]   = useState(false)
+
+  const input = 'border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    await onSave({
+      facilityIds: facIds,
+      primaryFacilityId: facIds.length ? (primary || null) : null,
+      pay: { hourlyWage: Number(wage || 0), transportType: tType, transportAmount: Number(tAmount || 0) },
+    })
+    setSaving(false)
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div className="flex flex-wrap gap-6">
+        <div>
+          <p className="text-xs text-gray-500 mb-2">所属施設（兼任は複数選択）</p>
+          <div className="flex flex-wrap gap-3">
+            {facilities.map(f => (
+              <label key={f.id} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={facIds.includes(f.id)}
+                  onChange={e => {
+                    setFacIds(prev => e.target.checked ? [...prev, f.id] : prev.filter(id => id !== f.id))
+                    if (!e.target.checked && primary === f.id) setPrimary('')
+                    if (e.target.checked && !primary) setPrimary(f.id)
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">{f.id}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        {facIds.length > 1 && (
+          <div>
+            <p className="text-xs text-gray-500 mb-2">主な所属</p>
+            <div className="flex flex-wrap gap-3">
+              {facIds.map(fid => (
+                <label key={fid} className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" name={`primary-${member.id}`} checked={primary === fid} onChange={() => setPrimary(fid)} />
+                  <span className="text-sm text-gray-700">{fid}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">時給（円）</label>
+          <input type="number" min={0} step={1} inputMode="numeric" value={wage}
+            onChange={e => setWage(e.target.value)} placeholder="1200" className={`${input} w-28`} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">交通費</label>
+          <div className="flex gap-2">
+            <select value={tType} onChange={e => setTType(e.target.value as StaffPayInfo['transportType'])} className={input}>
+              <option value="per_shift">1出勤あたり</option>
+              <option value="monthly">月額</option>
+            </select>
+            <input type="number" min={0} step={1} inputMode="numeric" value={tAmount}
+              onChange={e => setTAmount(e.target.value)} placeholder="0" className={`${input} w-28`} />
+          </div>
+        </div>
+        <div className="flex gap-2 ml-auto">
+          <button type="button" onClick={onCancel}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">キャンセル</button>
+          <button type="submit" disabled={saving}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+            {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+    </form>
+  )
+}
+
+// ─── 発行したログイン情報（この画面でしか表示しない）────────────
+function IssuedCard({
+  issued, onClose,
+}: {
+  issued: { name: string; loginId: string; pin: string; isReset: boolean }
+  onClose: () => void
+}) {
+  const text = `${issued.name}さん\nシフト管理のログイン情報です。\nURL：${typeof window !== 'undefined' ? window.location.origin : ''}\nログインID：${issued.loginId}\n${issued.isReset ? '新しい' : '初期'}PIN：${issued.pin}\n最初のログインでPINを自分の番号に変更してください。`
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('コピーしました')
+    } catch {
+      toast.error('コピーできませんでした。手で控えてください')
+    }
+  }
+
+  return (
+    <div className="bg-white border-2 border-gray-900 rounded-xl p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-gray-900">
+            {issued.name} さんの{issued.isReset ? 'PINを再発行しました' : 'ログイン情報を発行しました'}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">PINはこの画面を閉じると二度と表示されません。本人に渡すまで控えておいてください。</p>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-700" title="閉じる"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="flex gap-8 mt-4">
+        <div>
+          <p className="text-xs text-gray-500">ログインID</p>
+          <p className="text-2xl font-mono font-semibold tracking-wider text-gray-900">{issued.loginId}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">{issued.isReset ? '新しいPIN' : '初期PIN'}</p>
+          <p className="text-2xl font-mono font-semibold tracking-[0.3em] text-gray-900">{issued.pin}</p>
+        </div>
+      </div>
+      <button onClick={copy}
+        className="mt-4 inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+        <Copy className="w-4 h-4" />LINEなどに貼れる文面をコピー
+      </button>
     </div>
   )
 }

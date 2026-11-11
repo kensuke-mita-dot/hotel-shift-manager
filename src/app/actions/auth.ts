@@ -3,89 +3,73 @@
 import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { loginIdToEmail, PIN_PATTERN } from '@/lib/staff-login'
 
-export type AuthState =
-  | { status: 'idle' }
-  | { status: 'sent'; email: string }
-  | { status: 'error'; message: string }
-  | { status: 'verified' }
+export type AuthState = { error?: string }
 
-/** リクエストの origin を取得（プレビューURLでも正しく動く） */
-async function getOrigin(): Promise<string> {
-  const headersList = await headers()
-  // x-forwarded-host が優先（Vercel プレビューなど）
-  const host = headersList.get('x-forwarded-host') ?? headersList.get('host') ?? 'localhost:3000'
-  const proto = headersList.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
-  return `${proto}://${host}`
-}
+/**
+ * ログイン
+ * - スタッフ：ログインID＋6桁PIN（@ を含まない入力）
+ * - 管理者：メールアドレス＋パスワード
+ */
+export async function loginAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const identifier = String(formData.get('identifier') ?? '').trim()
+  const password   = String(formData.get('password')   ?? '')
 
-/** メールリンク（OTP）を送信する */
-export async function loginAction(
-  _prevState: AuthState,
-  formData: FormData
-): Promise<AuthState> {
-  const email = (formData.get('email') as string | null)?.trim() ?? ''
+  if (!identifier || !password) return { error: 'ログインIDとPINを入力してください' }
 
-  if (!email) {
-    return { status: 'error', message: 'メールアドレスを入力してください' }
-  }
+  const email = identifier.includes('@') ? identifier : loginIdToEmail(identifier)
 
-  // 招待済みアカウントのみ許可（新規登録は admin からの招待のみ）
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('email', email)
-    .maybeSingle()
-
-  if (!profile) {
-    return {
-      status: 'error',
-      message: 'このメールアドレスは登録されていません。管理者にお問い合わせください。',
+  const supabase = createClient()
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) {
+    if (/too many/i.test(error.message)) {
+      return { error: 'ログインの試行回数が上限に達しました。しばらく時間をおいてお試しください' }
     }
+    return { error: 'ログインIDまたはPINが正しくありません' }
   }
 
-  const emailRedirectTo = `${await getOrigin()}/auth/callback`
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ログインに失敗しました' }
 
-  const supabase = createClient()
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: false,
-      emailRedirectTo,
-    },
-  })
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, is_active')
+    .eq('id', user.id)
+    .single()
 
-  if (error) {
-    console.error('[loginAction] OTP error:', error.message)
-    return { status: 'error', message: 'メールの送信に失敗しました。しばらくしてから再度お試しください。' }
+  if (!profile?.is_active) {
+    await supabase.auth.signOut()
+    return { error: 'このアカウントは停止されています。管理者にお問い合わせください' }
   }
 
-  return { status: 'sent', email }
+  redirect(profile.role === 'admin' ? '/admin/daily' : '/staff/schedule')
 }
 
-/** 6桁コードでログインを確認する */
-export async function verifyOtpAction(
-  _prevState: AuthState,
-  formData: FormData
-): Promise<AuthState> {
-  const email = (formData.get('email') as string | null)?.trim() ?? ''
-  const token = (formData.get('token') as string | null)?.replace(/\s/g, '') ?? ''
+/** スタッフのPIN変更（初回ログイン時・任意のタイミング） */
+export async function changePinAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const pin     = String(formData.get('pin')     ?? '')
+  const confirm = String(formData.get('confirm') ?? '')
 
-  if (!token || token.length !== 6) {
-    return { status: 'error', message: '6桁のコードを入力してください' }
+  if (!PIN_PATTERN.test(pin)) return { error: 'PINは6桁の数字で入力してください' }
+  if (pin !== confirm)        return { error: '確認用のPINが一致しません' }
+  if (/^(\d)\1{5}$/.test(pin) || '0123456789'.includes(pin) || '9876543210'.includes(pin)) {
+    return { error: '同じ数字の繰り返しや連番は使えません' }
   }
 
   const supabase = createClient()
-  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
+  const { error } = await supabase.auth.updateUser({ password: pin })
   if (error) {
-    console.error('[verifyOtpAction] verify error:', error.message)
-    return { status: 'error', message: 'コードが正しくないか、有効期限が切れています' }
+    if (/different from the old/i.test(error.message)) return { error: '今のPINと違う番号にしてください' }
+    return { error: 'PINの変更に失敗しました' }
   }
 
-  redirect('/staff/requests')
+  await createAdminClient().from('profiles').update({ must_change_pin: false }).eq('id', user.id)
+
+  redirect('/staff/schedule?pin=changed')
 }
 
 /** ログアウト */
