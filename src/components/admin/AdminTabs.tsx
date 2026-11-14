@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { todayJST, nextMonthJST } from '@/lib/utils'
 
 const FACILITIES = [
   { label: '全施設', param: 'all' },
@@ -18,8 +19,11 @@ function AdminTabsInner() {
   const searchParams = useSearchParams()
 
   const facility = searchParams.get('facility') ?? 'all'
-  const date     = searchParams.get('date')     ?? '2026-12-01'
-  const month    = searchParams.get('month')    ?? '2026-12'
+  // 日付と月は画面間で引き継ぐ（日次→月間はその日の月、月間→日次はその月の1日）
+  const qDate    = searchParams.get('date')
+  const qMonth   = searchParams.get('month')
+  const month    = qMonth ?? qDate?.slice(0, 7) ?? nextMonthJST()
+  const date     = qDate ?? (qMonth ? `${qMonth}-01` : todayJST())
 
   const isDaily   = pathname.startsWith('/admin/daily')
   const isMonthly = pathname.startsWith('/admin/monthly')

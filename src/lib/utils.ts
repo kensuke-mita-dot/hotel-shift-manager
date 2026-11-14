@@ -37,3 +37,14 @@ export function monthRange(month: string): { from: string; to: string; days: num
   const pad = (n: number) => String(n).padStart(2, '0')
   return { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(days)}`, days }
 }
+
+/** 日本時間の今月 'YYYY-MM' */
+export function currentMonthJST(): string {
+  return todayJST().slice(0, 7)
+}
+
+/** 日本時間の来月 'YYYY-MM'（シフトを組む対象の月の初期値） */
+export function nextMonthJST(): string {
+  const [y, m] = currentMonthJST().split('-').map(Number)
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+}

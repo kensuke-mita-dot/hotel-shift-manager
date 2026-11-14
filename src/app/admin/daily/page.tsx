@@ -1,5 +1,6 @@
 import { fetchDayBoard } from '@/app/actions/board'
 import { DailyClient } from './DailyClient'
+import { todayJST } from '@/lib/utils'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -8,7 +9,7 @@ export default async function DailyPage({
 }: {
   searchParams: { facility?: string; date?: string }
 }) {
-  const date     = DATE.test(searchParams.date ?? '') ? searchParams.date! : '2026-12-01'
+  const date     = DATE.test(searchParams.date ?? '') ? searchParams.date! : todayJST()
   const facility = searchParams.facility ?? 'all'
 
   const board = await fetchDayBoard(date)

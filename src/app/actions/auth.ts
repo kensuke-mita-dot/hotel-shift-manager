@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { loginIdToEmail, PIN_PATTERN } from '@/lib/staff-login'
 
 export type AuthState = { error?: string }
@@ -70,6 +71,53 @@ export async function changePinAction(_prev: AuthState, formData: FormData): Pro
   await createAdminClient().from('profiles').update({ must_change_pin: false }).eq('id', user.id)
 
   redirect('/staff/schedule?pin=changed')
+}
+
+/** 管理者のパスワード変更（ログイン中・再設定メールから戻ってきたとき） */
+export async function changePasswordAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const password = String(formData.get('password') ?? '')
+  const confirm  = String(formData.get('confirm')  ?? '')
+
+  if (password.length < 10)  return { error: 'パスワードは10文字以上にしてください' }
+  if (password !== confirm)  return { error: '確認用のパスワードが一致しません' }
+
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) {
+    if (/different from the old/i.test(error.message)) return { error: '今のパスワードと違うものにしてください' }
+    if (/weak|pwned|leaked/i.test(error.message))      return { error: 'このパスワードは使えません。より推測されにくいものにしてください' }
+    if (/reauthentication|nonce/i.test(error.message)) return { error: 'セキュリティのため、一度ログアウトしてログインし直してから変更してください' }
+    return { error: 'パスワードの変更に失敗しました' }
+  }
+
+  redirect('/account/password?changed=1')
+}
+
+/** 管理者のパスワード再設定メールを送る（スタッフのPINは管理者が再発行） */
+export async function sendPasswordResetAction(_prev: AuthState & { sent?: boolean }, formData: FormData): Promise<AuthState & { sent?: boolean }> {
+  const email = String(formData.get('email') ?? '').trim()
+  if (!email) return { error: 'メールアドレスを入力してください' }
+  if (!email.includes('@')) {
+    return { error: 'スタッフの方は、管理者にPINの再発行を依頼してください' }
+  }
+
+  const h = headers()
+  const host  = h.get('x-forwarded-host') ?? h.get('host')
+  const proto = h.get('x-forwarded-proto') ?? 'https'
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? `${proto}://${host}`
+
+  const supabase = createClient()
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/account/password`,
+  })
+  if (error && /rate limit|too many/i.test(error.message)) {
+    return { error: '送信回数の上限に達しました。1時間ほど時間をおいてお試しください' }
+  }
+  // 登録の有無が分からないよう、成功・失敗に関わらず同じ表示にする
+  return { sent: true }
 }
 
 /** ログアウト */

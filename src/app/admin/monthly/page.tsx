@@ -1,12 +1,14 @@
 import { fetchMonthBoard } from '@/app/actions/board'
 import { MonthlyClient } from './MonthlyClient'
 
+import { nextMonthJST } from '@/lib/utils'
+
 export default async function MonthlyPage({
   searchParams,
 }: {
   searchParams: { facility?: string; month?: string }
 }) {
-  const month    = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : '2026-12'
+  const month    = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : nextMonthJST()
   const facility = searchParams.facility ?? 'all'
 
   const board = await fetchMonthBoard(month)
