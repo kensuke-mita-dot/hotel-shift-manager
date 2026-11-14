@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import Link from 'next/link'
 
 const initial: AuthState = {}
 
@@ -90,6 +91,9 @@ function LoginForm() {
 
         <p className="text-center text-xs text-hs-text-lighter mt-6">
           ログインIDやPINがわからないときは、管理者に再発行を依頼してください
+        </p>
+        <p className="text-center text-xs mt-2">
+          <Link href="/login/forgot" className="text-hs-text-sub underline">管理者の方：パスワードを忘れた場合</Link>
         </p>
       </div>
     </div>

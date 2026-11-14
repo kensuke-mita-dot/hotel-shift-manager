@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { loginIdToEmail } from '@/lib/staff-login'
 import { revalidatePath } from 'next/cache'
 import type { UserRole } from '@/types'
-import { TARGET_MONTH } from '@/types'
+import { nextMonthJST } from '@/lib/utils'
 
 export interface FacilityBadge {
   facilityId: string
@@ -60,7 +60,7 @@ export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?
     admin.from('staff_facilities').select('staff_id, facility_id, is_primary, facilities(name)'),
     admin.from('request_submissions')
       .select('staff_id, submitted_at, extended_until')
-      .eq('month', TARGET_MONTH),
+      .eq('month', `${nextMonthJST()}-01`),
     admin.from('staff_pay').select('staff_id, hourly_wage, transport_type, transport_amount'),
   ])
 
@@ -279,7 +279,7 @@ export async function extendDeadline(
 
   const admin = createAdminClient()
   const { error } = await admin.from('request_submissions').upsert(
-    { staff_id: staffId, month: TARGET_MONTH, extended_until: extendedUntil },
+    { staff_id: staffId, month: `${nextMonthJST()}-01`, extended_until: extendedUntil },
     { onConflict: 'staff_id,month' }
   )
   if (error) return { error: error.message }

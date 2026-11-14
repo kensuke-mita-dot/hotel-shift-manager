@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { REQUESTS_ENABLED } from '@/types'
 
 export function StaffTabs() {
   const pathname = usePathname()
@@ -12,7 +13,7 @@ export function StaffTabs() {
   return (
     <div className="sticky top-14 z-20 bg-white border-b border-hs-border flex px-2">
       <TabLink href="/staff/schedule" active={isSchedule}>確定シフト</TabLink>
-      <TabLink href="/staff/requests" active={isRequests}>希望入力</TabLink>
+      {REQUESTS_ENABLED && <TabLink href="/staff/requests" active={isRequests}>希望入力</TabLink>}
       <TabLink href="/staff/pin"      active={isPin}>PIN変更</TabLink>
     </div>
   )

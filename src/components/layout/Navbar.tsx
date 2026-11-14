@@ -1,5 +1,6 @@
 // Server Component — ヘッダー。未ログイン時は非表示
 import { createClient } from '@/lib/supabase-server'
+import Link from 'next/link'
 import { logoutAction } from '@/app/actions/auth'
 
 export async function Navbar() {
@@ -37,7 +38,14 @@ export async function Navbar() {
         <span className="text-sm text-hs-text-sub truncate">{userLabel}</span>
       </div>
 
-      <form action={logoutAction} className="flex-shrink-0 ml-3">
+      <div className="flex items-center flex-shrink-0 ml-3">
+      {profile?.role === 'admin' && (
+        <Link href="/account/password"
+          className="text-sm text-hs-text-light hover:text-hs-text px-2 py-1 rounded transition-colors min-h-tap inline-flex items-center">
+          パスワード変更
+        </Link>
+      )}
+      <form action={logoutAction}>
         <button
           type="submit"
           className="text-sm text-hs-text-light hover:text-hs-text px-2 py-1 rounded transition-colors min-h-tap"
@@ -45,6 +53,7 @@ export async function Navbar() {
           ログアウト
         </button>
       </form>
+      </div>
     </header>
   )
 }

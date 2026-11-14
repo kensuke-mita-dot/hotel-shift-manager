@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase-server'
 import type { RequestType, ShiftRequest, FacilitySlot } from '@/types'
-import { TARGET_MONTH } from '@/types'
+import { nextMonthJST, currentMonthJST, monthRange } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 
 export interface RequestsPageData {
@@ -18,8 +18,8 @@ export async function fetchRequestsData(userId: string): Promise<RequestsPageDat
   const supabase = createClient()
 
   const [requestsRes, submissionRes, facilitiesRes] = await Promise.all([
-    supabase.from('shift_requests').select('*').eq('staff_id', userId).gte('date', '2026-12-01').lte('date', '2026-12-31'),
-    supabase.from('request_submissions').select('submitted_at, extended_until').eq('staff_id', userId).eq('month', TARGET_MONTH).maybeSingle(),
+    supabase.from('shift_requests').select('*').eq('staff_id', userId).gte('date', monthRange(nextMonthJST()).from).lte('date', monthRange(nextMonthJST()).to),
+    supabase.from('request_submissions').select('submitted_at, extended_until').eq('staff_id', userId).eq('month', `${nextMonthJST()}-01`).maybeSingle(),
     supabase.from('staff_facilities').select('facility_id, is_primary').eq('staff_id', userId),
   ])
 
@@ -45,7 +45,7 @@ export async function fetchRequestsData(userId: string): Promise<RequestsPageDat
     extendedUntil: submissionRes.data?.extended_until ?? null,
     primaryFacilitySlots,
     availableSlotKeys,
-    deadlineDate: '2026-11-15',
+    deadlineDate: `${currentMonthJST()}-15`,  // 翌月分の提出期限は今月15日
   }
 }
 
@@ -61,8 +61,8 @@ export async function saveAndSubmitRequests(
     .from('shift_requests')
     .delete()
     .eq('staff_id', user.id)
-    .gte('date', '2026-12-01')
-    .lte('date', '2026-12-31')
+    .gte('date', monthRange(nextMonthJST()).from)
+    .lte('date', monthRange(nextMonthJST()).to)
   if (delError) return { error: delError.message }
 
   if (entries.length > 0) {
@@ -77,7 +77,7 @@ export async function saveAndSubmitRequests(
     if (error) return { error: error.message }
   }
 
-  const { error: submitError } = await supabase.rpc('submit_requests', { p_month: TARGET_MONTH })
+  const { error: submitError } = await supabase.rpc('submit_requests', { p_month: `${nextMonthJST()}-01` })
   if (submitError) return { error: submitError.message }
 
   revalidatePath('/staff/requests')

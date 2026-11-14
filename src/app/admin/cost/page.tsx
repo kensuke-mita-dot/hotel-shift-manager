@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { fetchCost } from '@/app/actions/cost'
-import { yen, cn } from '@/lib/utils'
+import { yen, cn, nextMonthJST } from '@/lib/utils'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const hours = (min: number) => `${(Math.round(min / 6) / 10).toLocaleString('ja-JP')}h`
@@ -17,7 +17,7 @@ export default async function CostPage({
 }: {
   searchParams: { month?: string; facility?: string }
 }) {
-  const month = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : '2026-12'
+  const month = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : nextMonthJST()
   const facility = searchParams.facility && searchParams.facility !== 'all' ? searchParams.facility : null
   const [y, m] = month.split('-').map(Number)
   const data = await fetchCost(month)

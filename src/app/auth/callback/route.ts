@@ -36,7 +36,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=inactive', origin))
   }
 
+  // パスワード再設定などで戻り先が指定されていればそこへ（同じサイト内のパスのみ）
+  const next = searchParams.get('next')
+  if (next && next.startsWith('/') && !next.startsWith('//')) {
+    return NextResponse.redirect(new URL(next, origin))
+  }
+
   // 役割に応じてリダイレクト
-  const dest = profile?.role === 'admin' ? '/admin/daily' : '/staff/requests'
+  const dest = profile?.role === 'admin' ? '/admin/daily' : '/staff/schedule'
   return NextResponse.redirect(new URL(dest, origin))
 }

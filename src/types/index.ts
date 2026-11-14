@@ -152,8 +152,12 @@ export interface Violation {
   message:   string
 }
 
-// ─── 対象月（Phase 1 固定：12月） ─────────────────────────
-export const TARGET_MONTH = '2026-12-01' as const  // 12月固定。後で動的化
+// ─── 希望入力 ─────────────────────────────────────────────
+/**
+ * スタッフの希望入力（提出・期限延長）を使うか。
+ * 当面は別ツールで希望を集めて管理者が手入力するため false（タブ・列を隠す）。
+ */
+export const REQUESTS_ENABLED = false
 
 /** 希望入力の略称ラベル */
 export const REQUEST_LABEL: Record<RequestType, string> = {

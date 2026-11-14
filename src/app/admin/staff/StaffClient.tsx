@@ -15,6 +15,7 @@ import {
   type StaffListItem,
   type StaffPayInfo,
 } from '@/app/actions/staff'
+import { REQUESTS_ENABLED } from '@/types'
 import { yen } from '@/lib/utils'
 import type { Facility, UserRole } from '@/types'
 
@@ -200,7 +201,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
             <h1 className="text-xl font-semibold text-gray-900">スタッフ管理</h1>
             <div className="flex items-center gap-3 mt-1 text-sm">
               <span className="text-gray-500">{staff.length}名登録中</span>
-              {unsubmittedCount > 0 && (
+              {REQUESTS_ENABLED && unsubmittedCount > 0 && (
                 <span className="font-medium text-red-600">未提出 {unsubmittedCount}名</span>
               )}
             </div>
@@ -348,8 +349,10 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">名前</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">所属施設・時給</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">12月の提出状況</th>
+                {REQUESTS_ENABLED && <>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">希望の提出状況</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">期限延長</th>
+                </>}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -432,6 +435,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                     </button>
                   </td>
 
+                  {REQUESTS_ENABLED && <>
                   {/* 提出状況 */}
                   <td className="px-4 py-3 text-xs">
                     {member.submittedAt ? (
@@ -500,6 +504,8 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                     )}
                   </td>
 
+                  </>}
+
                   {/* 操作 */}
                   <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -545,7 +551,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                 </tr>
                 {editingId === member.id && (
                   <tr className="border-b border-gray-100 bg-gray-50/70">
-                    <td colSpan={5} className="px-4 py-4">
+                    <td colSpan={REQUESTS_ENABLED ? 5 : 3} className="px-4 py-4">
                       <SettingsEditor
                         member={member}
                         facilities={facilities}
@@ -559,7 +565,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={REQUESTS_ENABLED ? 5 : 3} className="px-4 py-8 text-center text-gray-400 text-sm">
                     スタッフが見つかりません
                   </td>
                 </tr>
