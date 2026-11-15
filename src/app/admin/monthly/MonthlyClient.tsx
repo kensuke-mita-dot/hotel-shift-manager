@@ -108,11 +108,11 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
         <table className="text-xs border-separate border-spacing-0 w-full">
           <thead>
             <tr className="bg-hs-gray-lighter">
-              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border w-[128px] min-w-[128px]">スタッフ</th>
+              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border w-[96px] min-w-[96px]">スタッフ</th>
               {dates.map(d => {
                 const wd = weekday(d)
                 return (
-                  <th key={d} className={cn('sticky top-0 z-20 bg-hs-gray-lighter px-0.5 py-1 font-medium border-b border-l border-hs-border min-w-[34px]',
+                  <th key={d} className={cn('sticky top-0 z-20 bg-hs-gray-lighter px-0.5 py-1 font-medium border-b border-l border-hs-border min-w-[32px]',
                     wd === 0 ? 'text-hs-danger' : wd === 6 ? 'text-hs-blue' : 'text-hs-text-sub')}>
                     <Link href={`/admin/daily?facility=${facility}&date=${d}`} className="block hover:underline">
                       <div>{Number(d.slice(8))}</div>
@@ -139,8 +139,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                   </tr>
                 )}
                 <tr className="hover:bg-hs-gray-lighter/60">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-1.5 border-b border-hs-border whitespace-nowrap text-hs-text">
-                    {s.loginId && <span className="font-mono text-[10px] text-hs-text-lighter mr-1.5">{s.loginId}</span>}
+                  <td className="sticky left-0 z-10 bg-white px-2.5 py-1.5 border-b border-hs-border whitespace-nowrap text-hs-text">
                     {s.fullName}
                     {s.isAdmin && <span className="ml-1 text-[10px] text-hs-text-lighter">管理者</span>}
                   </td>
