@@ -137,7 +137,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
   })
 
   return (
-    <div className="p-4 md:p-6 space-y-4 pb-48">
+    <div className="px-4 py-4 md:px-10 md:py-6 space-y-4 pb-48">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-hs-text">希望</h1>
