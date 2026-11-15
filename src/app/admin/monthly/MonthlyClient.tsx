@@ -105,10 +105,10 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
 
       {/* 表 */}
       <div className="bg-white rounded-card border border-hs-border overflow-auto max-h-[calc(100dvh-13rem)]">
-        <table className="text-xs border-separate border-spacing-0 min-w-full">
+        <table className="text-xs border-separate border-spacing-0 w-full">
           <thead>
             <tr className="bg-hs-gray-lighter">
-              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border min-w-[120px]">スタッフ</th>
+              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border w-[128px] min-w-[128px]">スタッフ</th>
               {dates.map(d => {
                 const wd = weekday(d)
                 return (
