@@ -48,3 +48,17 @@ export function nextMonthJST(): string {
   const [y, m] = currentMonthJST().split('-').map(Number)
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
 }
+
+/** スタッフ一覧の施設の並び順（主な所属でまとめる） */
+export const FACILITY_ORDER = ['BHJ', 'MAHT', 'BHKK', 'MAHNM', 'MAHB'] as const
+
+export function facilityRank(id: string | null | undefined): number {
+  if (!id) return FACILITY_ORDER.length + 1
+  const i = (FACILITY_ORDER as readonly string[]).indexOf(id)
+  return i === -1 ? FACILITY_ORDER.length : i
+}
+
+/** 主な所属（なければ最初の所属） */
+export function mainFacility(s: { primaryFacilityId: string | null; facilityIds: string[] }): string | null {
+  return s.primaryFacilityId ?? s.facilityIds[0] ?? null
+}

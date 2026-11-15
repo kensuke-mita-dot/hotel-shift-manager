@@ -1,12 +1,12 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { Fragment, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { setRequestAsAdmin, type RequestBoard, type BoardRequest } from '@/app/actions/board'
-import { monthRange, weekday, WEEK_JA, cn } from '@/lib/utils'
+import { monthRange, weekday, WEEK_JA, cn, mainFacility } from '@/lib/utils'
 import { hhmm } from '@/lib/shift-kinds'
 import { REQUEST_LABEL } from '@/types'
 import type { RequestType } from '@/types'
@@ -48,6 +48,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
   const [endT, setEndT] = useState('15:00')
   const [pending, start] = useTransition()
 
+  const facilityName = new Map(board.facilities.map(f => [f.id, f.name]))
   const rows = facility === 'all'
     ? board.staff
     : board.staff.filter(s => s.facilityIds.includes(facility))
@@ -129,10 +130,20 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
             </tr>
           </thead>
           <tbody>
-            {rows.map(s => {
+            {rows.map((s, i) => {
               const sub = subBy.get(s.id)
+              const group = mainFacility(s)
+              const newGroup = i === 0 || mainFacility(rows[i - 1]) !== group
               return (
-                <tr key={s.id}>
+                <Fragment key={s.id}>
+                {newGroup && (
+                  <tr>
+                    <td colSpan={dates.length + 1} className="sticky left-0 bg-hs-gray-light px-3 py-1 text-[11px] font-semibold text-hs-text-sub border-b border-hs-border">
+                      {group ? `${group}　${facilityName.get(group) ?? ''}` : '所属未設定'}
+                    </td>
+                  </tr>
+                )}
+                <tr>
                   <td className="sticky left-0 z-10 bg-white px-3 py-1.5 border-b border-hs-border whitespace-nowrap">
                     <div className="text-hs-text">
                       {s.fullName}
@@ -163,6 +174,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                     )
                   })}
                 </tr>
+                </Fragment>
               )
             })}
             {rows.length === 0 && (

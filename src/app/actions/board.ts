@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth-guard'
-import { addDays, monthRange } from '@/lib/utils'
+import { addDays, monthRange, facilityRank, mainFacility } from '@/lib/utils'
 import { KIND_BOTH, KIND_CUSTOM, bothTimes } from '@/lib/shift-kinds'
 import type { Facility, FacilitySlot, RequestType } from '@/types'
 
@@ -74,6 +74,10 @@ async function loadBase(): Promise<BoardBase> {
       facilityIds: sfMap.get(p.id)?.ids ?? [],
       primaryFacilityId: sfMap.get(p.id)?.primary ?? null,
     }))
+    // 主な所属の施設順（BHJ → MAHT → BHKK → MAHNM → MAHB → 未設定）、同じ施設内は名前順
+    .sort((a, b) =>
+      facilityRank(mainFacility(a)) - facilityRank(mainFacility(b))
+      || a.fullName.localeCompare(b.fullName, 'ja'))
 
   return { facilities: (fRes.data ?? []) as Facility[], slots: (sRes.data ?? []) as FacilitySlot[], staff }
 }

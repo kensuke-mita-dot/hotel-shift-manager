@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useTransition } from 'react'
+import { Fragment, useMemo, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Send, Loader2 } from 'lucide-react'
@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { publishMonth, type MonthBoard, type BoardShift } from '@/app/actions/board'
 import { KIND_SHORT, KIND_COLOR, hhmm } from '@/lib/shift-kinds'
 import { coversSlot } from '@/lib/rules'
-import { monthRange, weekday, WEEK_JA, cn } from '@/lib/utils'
+import { monthRange, weekday, WEEK_JA, cn, mainFacility } from '@/lib/utils'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -36,6 +36,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
 
   // 行：シフト対象の人のうち、この施設の所属か、この月にこの施設で入っている人
   const withShift = new Set(shifts.map(s => s.staff_id))
+  const facilityName = new Map(board.facilities.map(f => [f.id, f.name]))
   const rows = board.staff.filter(s => isAll || s.facilityIds.includes(facility) || withShift.has(s.id))
 
   const cell = useMemo(() => {
@@ -124,10 +125,20 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
             </tr>
           </thead>
           <tbody>
-            {rows.map(s => {
+            {rows.map((s, i) => {
               const count = new Set(shifts.filter(x => x.staff_id === s.id).map(x => x.date)).size
+              const group = mainFacility(s)
+              const newGroup = i === 0 || mainFacility(rows[i - 1]) !== group
               return (
-                <tr key={s.id} className="hover:bg-hs-gray-lighter/60">
+                <Fragment key={s.id}>
+                {newGroup && (
+                  <tr>
+                    <td colSpan={dates.length + 2} className="sticky left-0 bg-hs-gray-light px-3 py-1 text-[11px] font-semibold text-hs-text-sub border-b border-hs-border">
+                      {group ? `${group}　${facilityName.get(group) ?? ''}` : '所属未設定'}
+                    </td>
+                  </tr>
+                )}
+                <tr className="hover:bg-hs-gray-lighter/60">
                   <td className="sticky left-0 z-10 bg-white px-3 py-1.5 border-b border-hs-border whitespace-nowrap text-hs-text">
                     {s.fullName}
                     {s.isAdmin && <span className="ml-1 text-[10px] text-hs-text-lighter">管理者</span>}
@@ -151,6 +162,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                   })}
                   <td className="px-2 py-1.5 border-b border-l border-hs-border text-center tabular-nums text-hs-text">{count}</td>
                 </tr>
+                </Fragment>
               )
             })}
             {rows.length === 0 && (
