@@ -287,6 +287,42 @@ export async function extendDeadline(
   return {}
 }
 
+// ─── 全員の提出期限をまとめて延長（null で全員の延長を取り消し）──
+export async function extendDeadlineAll(
+  extendedUntil: string | null,
+): Promise<{ count?: number; error?: string }> {
+  const guard = await requireAdmin()
+  if ('error' in guard) return { error: guard.error }
+  if (extendedUntil !== null && !/^\d{4}-\d{2}-\d{2}$/.test(extendedUntil)) return { error: '日付が不正です' }
+
+  const admin = createAdminClient()
+  const month = `${nextMonthJST()}-01`
+
+  if (extendedUntil === null) {
+    const { error } = await admin.from('request_submissions')
+      .update({ extended_until: null }).eq('month', month).not('extended_until', 'is', null)
+    if (error) return { error: error.message }
+    revalidatePath('/admin/staff')
+    return { count: 0 }
+  }
+
+  // 対象：在籍中で、シフトに入る人（スタッフ＋シフトに入る管理者）
+  const { data: people, error: pErr } = await admin
+    .from('profiles').select('id, role, is_staff').eq('is_active', true)
+  if (pErr) return { error: pErr.message }
+  const ids = (people ?? []).filter(p => p.role === 'staff' || p.is_staff).map(p => p.id)
+  if (ids.length === 0) return { count: 0 }
+
+  // 提出済みの人も延長する（期限内なら出し直しができるように）
+  const { error } = await admin.from('request_submissions').upsert(
+    ids.map(id => ({ staff_id: id, month, extended_until: extendedUntil })),
+    { onConflict: 'staff_id,month', ignoreDuplicates: false },
+  )
+  if (error) return { error: error.message }
+  revalidatePath('/admin/staff')
+  return { count: ids.length }
+}
+
 // ─── 停止 / 復帰 ──────────────────────────────────────────────
 export async function setStaffActive(staffId: string, isActive: boolean): Promise<{ error?: string }> {
   const guard = await requireAdmin()

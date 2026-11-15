@@ -8,6 +8,7 @@ import {
   resetPin,
   updateStaffSettings,
   extendDeadline,
+  extendDeadlineAll,
   setStaffActive,
   setIsStaff,
   updateRole,
@@ -16,7 +17,7 @@ import {
   type StaffPayInfo,
 } from '@/app/actions/staff'
 import { REQUESTS_ENABLED } from '@/types'
-import { yen, nextMonthJST } from '@/lib/utils'
+import { yen, nextMonthJST, todayJST, addDays } from '@/lib/utils'
 import type { Facility, UserRole } from '@/types'
 
 const AVATAR_COLORS = [
@@ -41,9 +42,7 @@ function fmtDateShort(dateStr: string) {
 }
 
 function defaultExtendDate() {
-  const d = new Date()
-  d.setDate(d.getDate() + 7)
-  return d.toISOString().split('T')[0]
+  return addDays(todayJST(), 7)
 }
 
 interface Props {
@@ -144,6 +143,33 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
     })
   }
 
+  // ─── 全員まとめて延長 ───────────────────────────────────────
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkDate, setBulkDate] = useState(defaultExtendDate())
+  const targetMonthLabel = `${Number(nextMonthJST().slice(5))}月`
+
+  const handleExtendAll = () => {
+    const [, m, day] = bulkDate.split('-').map(Number)
+    if (!confirm(`シフトに入る全員の${targetMonthLabel}の希望の提出期限を ${m}/${day} まで延長しますか？`)) return
+    startTransition(async () => {
+      const result = await extendDeadlineAll(bulkDate)
+      if (result.error) { toast.error(result.error); return }
+      toast.success(`${result.count ?? 0}名の期限を ${m}/${day} まで延長しました`)
+      setBulkOpen(false)
+      refresh()
+    })
+  }
+
+  const handleCancelExtendAll = () => {
+    if (!confirm(`全員の${targetMonthLabel}の延長を取り消しますか？（通常の期限に戻ります）`)) return
+    startTransition(async () => {
+      const result = await extendDeadlineAll(null)
+      if (result.error) { toast.error(result.error); return }
+      toast.success('全員の延長を取り消しました')
+      refresh()
+    })
+  }
+
   const handleCancelExtend = (staffId: string, name: string) => {
     startTransition(async () => {
       const result = await extendDeadline(staffId, null)
@@ -213,6 +239,39 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
             + スタッフを追加
           </button>
         </div>
+
+        {/* ── 提出期限の一括延長 ── */}
+        {REQUESTS_ENABLED && (
+          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-gray-700">{targetMonthLabel}の希望の提出期限</span>
+            {bulkOpen ? (
+              <>
+                <input type="date" value={bulkDate} onChange={e => setBulkDate(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
+                <span className="text-gray-500">まで</span>
+                <button onClick={handleExtendAll} disabled={isPending || !bulkDate}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  全員を延長
+                </button>
+                <button onClick={() => setBulkOpen(false)} className="text-gray-400 hover:text-gray-600 text-sm">やめる</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => { setBulkDate(defaultExtendDate()); setBulkOpen(true) }} disabled={isPending}
+                  className="px-3 py-1.5 border border-blue-200 text-blue-700 rounded-lg text-sm hover:bg-blue-50 disabled:opacity-50">
+                  全員まとめて延長
+                </button>
+                {staff.some(s => s.extendedUntil) && (
+                  <button onClick={handleCancelExtendAll} disabled={isPending}
+                    className="text-xs text-gray-400 underline hover:text-red-500 disabled:opacity-50">
+                    全員の延長を取り消す
+                  </button>
+                )}
+              </>
+            )}
+            <span className="text-xs text-gray-400 ml-auto">個別の延長は下の一覧から</span>
+          </div>
+        )}
 
         {/* ── 発行したログイン情報 ── */}
         {issued && <IssuedCard issued={issued} onClose={() => setIssued(null)} />}
