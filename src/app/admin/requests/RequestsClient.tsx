@@ -157,14 +157,14 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
       </div>
 
       <div className="bg-white rounded-card border border-hs-border overflow-auto max-h-[calc(100dvh-13rem)]">
-        <table className="text-xs border-separate border-spacing-0 min-w-full">
+        <table className="text-xs border-separate border-spacing-0 w-full">
           <thead>
             <tr className="bg-hs-gray-lighter">
-              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border min-w-[140px]">スタッフ</th>
+              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border w-[128px] min-w-[128px]">スタッフ</th>
               {dates.map(d => {
                 const wd = weekday(d)
                 return (
-                  <th key={d} className={cn('sticky top-0 z-20 bg-hs-gray-lighter px-0.5 py-1 font-medium border-b border-l border-hs-border min-w-[36px]',
+                  <th key={d} className={cn('sticky top-0 z-20 bg-hs-gray-lighter px-0.5 py-1 font-medium border-b border-l border-hs-border min-w-[34px]',
                     wd === 0 ? 'text-hs-danger' : wd === 6 ? 'text-hs-blue' : 'text-hs-text-sub')}>
                     <div>{Number(d.slice(8))}</div>
                     <div className="text-[10px]">{WEEK_JA[wd]}</div>
