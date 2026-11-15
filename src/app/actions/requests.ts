@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase-server'
 import type { RequestType, ShiftRequest, FacilitySlot } from '@/types'
 import { nextMonthJST, monthRange } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
+import { validateDayRequests } from '@/lib/requests'
 
 export interface RequestsPageData {
   requests: ShiftRequest[]
@@ -80,6 +81,13 @@ export async function saveAndSubmitRequests(
   if (!requestMonthList().includes(month)) return { error: 'この月の希望は出せません' }
   const { from, to } = monthRange(month)
   if (entries.some(e => e.date < from || e.date > to)) return { error: '対象月以外の日付が含まれています' }
+  // 1日に複数の希望を入れられる（「休」は単独のみ）
+  const byDate = new Map<string, typeof entries>()
+  for (const e of entries) byDate.set(e.date, [...(byDate.get(e.date) ?? []), e])
+  for (const [date, list] of Array.from(byDate)) {
+    const msg = validateDayRequests(list)
+    if (msg) return { error: `${Number(date.slice(5, 7))}/${Number(date.slice(8))}：${msg}` }
+  }
 
   // 当月分を全削除してから挿入（空欄になった日の削除漏れを防ぐ）
   const { error: delError } = await supabase
@@ -99,7 +107,12 @@ export async function saveAndSubmitRequests(
       end_time: e.end_time ?? null,
     }))
     const { error } = await supabase.from('shift_requests').insert(rows)
-    if (error) return { error: error.message }
+    if (error) {
+      if (/duplicate|unique/i.test(error.message)) {
+        return { error: '1日に複数の希望を出す準備がまだできていません。管理者に連絡してください' }
+      }
+      return { error: error.message }
+    }
   }
 
   const { error: submitError } = await supabase.rpc('submit_requests', { p_month: `${month}-01` })

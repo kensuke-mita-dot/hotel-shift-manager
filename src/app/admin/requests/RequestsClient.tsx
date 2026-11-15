@@ -1,11 +1,12 @@
 'use client'
 
-import { Fragment, useMemo, useState, useTransition } from 'react'
+import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { setRequestAsAdmin, type RequestBoard, type BoardRequest } from '@/app/actions/board'
+import { setDayRequestsAsAdmin, type RequestBoard, type BoardRequest } from '@/app/actions/board'
+import { normalizeRequests, requestText } from '@/lib/requests'
 import { monthRange, weekday, WEEK_JA, cn, mainFacility } from '@/lib/utils'
 import { hhmm } from '@/lib/shift-kinds'
 import { REQUEST_LABEL } from '@/types'
@@ -28,7 +29,8 @@ const TYPE_STYLE: Record<RequestType, string> = {
   off:     'bg-[#fdecec] text-hs-danger',
 }
 
-const BUTTONS: RequestType[] = ['morning', 'evening', 'both', 'night', 'off', 'custom']
+/** 複数選択できる希望（休は単独） */
+const MULTI: RequestType[] = ['morning', 'evening', 'both', 'night']
 
 type Cell = { staffId: string; date: string }
 
@@ -39,11 +41,19 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
   const { days } = monthRange(month)
   const dates = Array.from({ length: days }, (_, i) => `${month}-${pad(i + 1)}`)
 
-  // 画面上の希望（保存は1マスずつ即時。表示は先に反映）
-  const [reqs, setReqs] = useState<Map<string, BoardRequest>>(
-    () => new Map(board.requests.map(r => [`${r.staff_id}|${r.date}`, r])),
-  )
+  // 画面上の希望（1日に複数可。保存は1マスずつ。表示は先に反映）
+  const [reqs, setReqs] = useState<Map<string, BoardRequest[]>>(() => {
+    const m = new Map<string, BoardRequest[]>()
+    for (const r of board.requests) {
+      const k = `${r.staff_id}|${r.date}`
+      m.set(k, [...(m.get(k) ?? []), r])
+    }
+    return m
+  })
   const [selected, setSelected] = useState<Cell | null>(null)
+  // 選択中のマスの下書き（複数選択）
+  const [draft, setDraft] = useState<Set<RequestType>>(new Set())
+  const [useTime, setUseTime] = useState(false)
   const [startT, setStartT] = useState('10:00')
   const [endT, setEndT] = useState('15:00')
   const [pending, start] = useTransition()
@@ -55,22 +65,44 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
   const subBy = useMemo(() => new Map(board.submissions.map(s => [s.staff_id, s])), [board.submissions])
   const nameBy = useMemo(() => new Map(board.staff.map(s => [s.id, s.fullName])), [board.staff])
 
-  const save = (cell: Cell, type: RequestType | null) => {
+  const selKey = selected ? `${selected.staffId}|${selected.date}` : null
+  const selReqs = selKey ? (reqs.get(selKey) ?? []) : []
+
+  // マスを選んだら、今の希望を下書きに読み込む
+  useEffect(() => {
+    if (!selKey) return
+    const cur = reqs.get(selKey) ?? []
+    setDraft(new Set(cur.filter(r => r.type !== 'custom' && r.type !== 'off').map(r => r.type)))
+    const c = cur.find(r => r.type === 'custom')
+    setUseTime(!!c)
+    if (c?.start_time && c.end_time) { setStartT(c.start_time.slice(0, 5)); setEndT(c.end_time.slice(0, 5)) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey])
+
+  const goNext = (cell: Cell) => {
+    const idx = dates.indexOf(cell.date)
+    if (idx >= 0 && idx < dates.length - 1) setSelected({ staffId: cell.staffId, date: dates[idx + 1] })
+    else setSelected(null)
+  }
+
+  /** 1日分を保存して次の日へ */
+  const save = (cell: Cell, items: BoardRequest[]) => {
     const key = `${cell.staffId}|${cell.date}`
     const before = reqs.get(key)
-    const next = new Map(reqs)
-    if (type === null) next.delete(key)
-    else next.set(key, {
-      staff_id: cell.staffId, date: cell.date, type,
-      start_time: type === 'custom' ? `${startT}:00` : null,
-      end_time:   type === 'custom' ? `${endT}:00`   : null,
+    const list = normalizeRequests(items)
+    setReqs(prev => {
+      const next = new Map(prev)
+      if (list.length) next.set(key, list); else next.delete(key)
+      return next
     })
-    setReqs(next)
 
     start(async () => {
-      const r = await setRequestAsAdmin({
-        staffId: cell.staffId, date: cell.date, type,
-        ...(type === 'custom' ? { start: startT, end: endT } : {}),
+      const r = await setDayRequestsAsAdmin({
+        staffId: cell.staffId, date: cell.date,
+        items: list.map(i => ({
+          type: i.type,
+          ...(i.type === 'custom' ? { start: i.start_time!.slice(0, 5), end: i.end_time!.slice(0, 5) } : {}),
+        })),
       })
       if (r.error) {
         toast.error(r.error)
@@ -83,14 +115,26 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
       }
       router.refresh()
     })
-
-    // 次の日へ進める（続けて入力しやすく）
-    const idx = dates.indexOf(cell.date)
-    if (idx >= 0 && idx < dates.length - 1) setSelected({ staffId: cell.staffId, date: dates[idx + 1] })
-    else setSelected(null)
+    goNext(cell)
   }
 
-  const selReq = selected ? reqs.get(`${selected.staffId}|${selected.date}`) : undefined
+  const item = (cell: Cell, type: RequestType): BoardRequest => ({
+    staff_id: cell.staffId, date: cell.date, type,
+    start_time: type === 'custom' ? `${startT}:00` : null,
+    end_time:   type === 'custom' ? `${endT}:00`   : null,
+  })
+
+  const saveDraft = (cell: Cell) => {
+    if (useTime && startT === endT) { toast.error('時間指定の開始と終了が同じです'); return }
+    const items = [...Array.from(draft).map(t => item(cell, t)), ...(useTime ? [item(cell, 'custom')] : [])]
+    save(cell, items)
+  }
+
+  const toggle = (t: RequestType) => setDraft(prev => {
+    const next = new Set(prev)
+    if (next.has(t)) next.delete(t); else next.add(t)
+    return next
+  })
 
   return (
     <div className="p-4 md:p-6 space-y-4 pb-48">
@@ -155,21 +199,22 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                     </div>
                   </td>
                   {dates.map(d => {
-                    const r = reqs.get(`${s.id}|${d}`)
+                    const list = reqs.get(`${s.id}|${d}`) ?? []
+                    const r = list.length === 1 ? list[0] : null
                     const isSel = selected?.staffId === s.id && selected.date === d
                     return (
                       <td key={d} className="p-0.5 border-b border-l border-hs-border text-center">
                         <button
                           onClick={() => setSelected({ staffId: s.id, date: d })}
                           className={cn('w-full min-h-[32px] rounded text-[11px] font-medium leading-tight',
-                            r ? TYPE_STYLE[r.type] : 'hover:bg-hs-gray-lighter text-hs-text-lighter',
+                            r ? TYPE_STYLE[r.type] : list.length > 1 ? 'bg-[#eef3ea] text-[#3d6b2f]' : 'hover:bg-hs-gray-lighter text-hs-text-lighter',
                             isSel && 'ring-2 ring-hs-blue')}
-                          title={r?.type === 'custom' && r.start_time ? `${hhmm(r.start_time)}-${hhmm(r.end_time!)}` : undefined}
+                          title={list.length ? requestText(list) : undefined}
                         >
-                          {r ? REQUEST_LABEL[r.type] : '·'}
-                          {r?.type === 'custom' && r.start_time && (
-                            <span className="block text-[9px] font-normal">{hhmm(r.start_time)}-{hhmm(r.end_time!)}</span>
-                          )}
+                          {list.length === 0 ? '·' : requestText(list, { withTime: false })}
+                          {list.filter(x => x.type === 'custom' && x.start_time).map(x => (
+                            <span key="t" className="block text-[9px] font-normal">{hhmm(x.start_time!)}-{hhmm(x.end_time!)}</span>
+                          ))}
                         </button>
                       </td>
                     )
@@ -196,7 +241,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                 {nameBy.get(selected.staffId)}　{Number(selected.date.slice(5, 7))}/{Number(selected.date.slice(8))}（{WEEK_JA[weekday(selected.date)]}）
               </span>
               <span className="text-xs text-hs-text-sub">
-                今：{selReq ? REQUEST_LABEL[selReq.type] : 'なし'}
+                今：{selReqs.length ? requestText(selReqs) : 'なし'}
               </span>
               {pending && <Loader2 className="w-4 h-4 animate-spin text-hs-text-lighter" />}
               <button onClick={() => setSelected(null)} className="ml-auto h-8 w-8 inline-flex items-center justify-center rounded hover:bg-hs-gray-lighter" aria-label="閉じる">
@@ -204,30 +249,42 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {BUTTONS.filter(t => t !== 'custom').map(t => (
-                <button key={t} onClick={() => save(selected, t)}
-                  className={cn('h-10 min-w-[56px] px-3 rounded-btn text-sm font-medium border border-transparent', TYPE_STYLE[t],
-                    selReq?.type === t && 'ring-2 ring-hs-blue')}>
-                  {REQUEST_LABEL[t]}
+              {MULTI.map(t => (
+                <button key={t} onClick={() => toggle(t)} aria-pressed={draft.has(t)}
+                  className={cn('h-10 min-w-[56px] px-3 rounded-btn text-sm font-medium border-2',
+                    draft.has(t) ? `${TYPE_STYLE[t]} border-hs-blue` : 'bg-white text-hs-text-sub border-hs-border')}>
+                  {draft.has(t) ? '✓ ' : ''}{REQUEST_LABEL[t]}
                 </button>
               ))}
               <span className="inline-flex items-center gap-1 pl-2 border-l border-hs-border">
-                <input type="time" value={startT} onChange={e => setStartT(e.target.value)} step={900}
+                <button onClick={() => setUseTime(v => !v)} aria-pressed={useTime}
+                  className={cn('h-10 px-3 rounded-btn text-sm font-medium border-2',
+                    useTime ? `${TYPE_STYLE.custom} border-hs-blue` : 'bg-white text-hs-text-sub border-hs-border')}>
+                  {useTime ? '✓ ' : ''}時間指定
+                </button>
+                <input type="time" value={startT} onChange={e => { setStartT(e.target.value); setUseTime(true) }} step={900}
                   className="h-10 px-2 rounded-btn border border-hs-input-border text-base md:text-sm" aria-label="開始" />
                 <span className="text-hs-text-sub">〜</span>
-                <input type="time" value={endT} onChange={e => setEndT(e.target.value)} step={900}
+                <input type="time" value={endT} onChange={e => { setEndT(e.target.value); setUseTime(true) }} step={900}
                   className="h-10 px-2 rounded-btn border border-hs-input-border text-base md:text-sm" aria-label="終了" />
-                <button onClick={() => save(selected, 'custom')}
-                  className={cn('h-10 px-3 rounded-btn text-sm font-medium', TYPE_STYLE.custom, selReq?.type === 'custom' && 'ring-2 ring-hs-blue')}>
-                  時間指定
+              </span>
+              <button onClick={() => saveDraft(selected)} disabled={draft.size === 0 && !useTime}
+                className="h-10 px-4 rounded-btn bg-hs-blue hover:bg-hs-blue-hover text-white text-sm font-medium disabled:opacity-40">
+                決定して次の日へ
+              </button>
+              <span className="inline-flex items-center gap-2 pl-2 border-l border-hs-border ml-auto">
+                <button onClick={() => save(selected, [item(selected, 'off')])}
+                  className={cn('h-10 min-w-[56px] px-3 rounded-btn text-sm font-medium', TYPE_STYLE.off,
+                    selReqs.some(r => r.type === 'off') && 'ring-2 ring-hs-blue')}>
+                  休
+                </button>
+                <button onClick={() => save(selected, [])}
+                  className="h-10 px-3 rounded-btn text-sm text-hs-text-sub border border-hs-border bg-white">
+                  消す
                 </button>
               </span>
-              <button onClick={() => save(selected, null)}
-                className="h-10 px-3 rounded-btn text-sm text-hs-text-sub border border-hs-border bg-white ml-auto">
-                消す
-              </button>
             </div>
-            <p className="text-[11px] text-hs-text-lighter mt-2">押すと保存して、次の日に進みます。</p>
+            <p className="text-[11px] text-hs-text-lighter mt-2">朝・夕・朝夕・夜・時間指定は複数選べます（例：朝と夜のどちらでも可）。「休」「消す」は押すとすぐ保存して次の日へ進みます。</p>
           </div>
         </div>
       )}
