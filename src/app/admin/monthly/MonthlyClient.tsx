@@ -65,7 +65,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="px-4 py-4 md:px-10 md:py-6 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-1">
           <Link href={`/admin/monthly?facility=${facility}&month=${shiftMonth(month, -1)}`}
