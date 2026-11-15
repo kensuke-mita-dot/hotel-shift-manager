@@ -5,13 +5,14 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth-guard'
-import { addDays, monthRange, facilityRank, mainFacility } from '@/lib/utils'
+import { addDays, monthRange, facilityRank, mainFacility, compareByLoginId } from '@/lib/utils'
 import { KIND_BOTH, KIND_CUSTOM, bothTimes } from '@/lib/shift-kinds'
 import type { Facility, FacilitySlot, RequestType } from '@/types'
 
 export interface BoardStaff {
   id: string
   fullName: string
+  loginId: string | null
   isAdmin: boolean
   facilityIds: string[]
   primaryFacilityId: string | null
@@ -51,7 +52,7 @@ async function loadBase(): Promise<BoardBase> {
   const [fRes, sRes, pRes, sfRes] = await Promise.all([
     db.from('facilities').select('id, name, sort').order('sort'),
     db.from('facility_slots').select('*').order('sort'),
-    db.from('profiles').select('id, full_name, role, is_staff, is_active').eq('is_active', true).order('full_name'),
+    db.from('profiles').select('id, full_name, login_id, role, is_staff, is_active').eq('is_active', true).order('full_name'),
     db.from('staff_facilities').select('staff_id, facility_id, is_primary'),
   ])
   const err = fRes.error ?? sRes.error ?? pRes.error ?? sfRes.error
@@ -70,14 +71,13 @@ async function loadBase(): Promise<BoardBase> {
     .map(p => ({
       id: p.id,
       fullName: p.full_name,
+      loginId: p.login_id ?? null,
       isAdmin: p.role === 'admin',
       facilityIds: sfMap.get(p.id)?.ids ?? [],
       primaryFacilityId: sfMap.get(p.id)?.primary ?? null,
     }))
-    // 主な所属の施設順（BHJ → MAHT → BHKK → MAHNM → MAHB → 未設定）、同じ施設内は名前順
-    .sort((a, b) =>
-      facilityRank(mainFacility(a)) - facilityRank(mainFacility(b))
-      || a.fullName.localeCompare(b.fullName, 'ja'))
+    // 主な所属の施設順（BHJ → MAHT → BHKK → MAHNM → MAHB → 未設定）、同じ施設内はログインID順
+    .sort((a, b) => facilityRank(mainFacility(a)) - facilityRank(mainFacility(b)) || compareByLoginId(a, b))
 
   return { facilities: (fRes.data ?? []) as Facility[], slots: (sRes.data ?? []) as FacilitySlot[], staff }
 }

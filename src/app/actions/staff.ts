@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { loginIdToEmail } from '@/lib/staff-login'
 import { revalidatePath } from 'next/cache'
 import type { UserRole } from '@/types'
-import { nextMonthJST, facilityRank } from '@/lib/utils'
+import { nextMonthJST, facilityRank, compareByLoginId } from '@/lib/utils'
 
 export interface FacilityBadge {
   facilityId: string
@@ -115,9 +115,9 @@ export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?
     }
   })
 
-  // 主な所属の施設順（BHJ → MAHT → BHKK → MAHNM → MAHB → 未設定）、同じ施設内は名前順
+  // 主な所属の施設順（BHJ → MAHT → BHKK → MAHNM → MAHB → 未設定）、同じ施設内はログインID順
   const main = (x: StaffListItem) => x.facilities.find(f => f.isPrimary)?.facilityId ?? x.facilities[0]?.facilityId ?? null
-  staff.sort((a, b) => facilityRank(main(a)) - facilityRank(main(b)) || a.fullName.localeCompare(b.fullName, 'ja'))
+  staff.sort((a, b) => facilityRank(main(a)) - facilityRank(main(b)) || compareByLoginId(a, b))
 
   return { staff }
 }

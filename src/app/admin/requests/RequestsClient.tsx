@@ -150,6 +150,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                       {s.isAdmin && <span className="ml-1 text-[10px] text-hs-text-lighter">管理者</span>}
                     </div>
                     <div className={cn('text-[10px]', sub?.submitted_at ? 'text-green-700' : 'text-hs-text-lighter')}>
+                      {s.loginId && <span className="font-mono text-hs-text-lighter mr-1.5">{s.loginId}</span>}
                       {sub?.submitted_at ? '本人提出済' : '本人未提出'}
                     </div>
                   </td>

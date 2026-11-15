@@ -140,6 +140,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                 )}
                 <tr className="hover:bg-hs-gray-lighter/60">
                   <td className="sticky left-0 z-10 bg-white px-3 py-1.5 border-b border-hs-border whitespace-nowrap text-hs-text">
+                    {s.loginId && <span className="font-mono text-[10px] text-hs-text-lighter mr-1.5">{s.loginId}</span>}
                     {s.fullName}
                     {s.isAdmin && <span className="ml-1 text-[10px] text-hs-text-lighter">管理者</span>}
                   </td>

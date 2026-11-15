@@ -58,6 +58,17 @@ export function facilityRank(id: string | null | undefined): number {
   return i === -1 ? FACILITY_ORDER.length : i
 }
 
+/** 同じ施設内の並び：ログインID順（BHJ01, BHJ02…）、IDのない人（管理者）は後ろに名前順 */
+export function compareByLoginId(
+  a: { loginId: string | null; fullName: string },
+  b: { loginId: string | null; fullName: string },
+): number {
+  if (a.loginId && b.loginId) return a.loginId.localeCompare(b.loginId, 'en', { numeric: true })
+  if (a.loginId) return -1
+  if (b.loginId) return 1
+  return a.fullName.localeCompare(b.fullName, 'ja')
+}
+
 /** 主な所属（なければ最初の所属） */
 export function mainFacility(s: { primaryFacilityId: string | null; facilityIds: string[] }): string | null {
   return s.primaryFacilityId ?? s.facilityIds[0] ?? null
