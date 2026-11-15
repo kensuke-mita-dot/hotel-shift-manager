@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { setDayRequestsAsAdmin, type RequestBoard, type BoardRequest } from '@/app/actions/board'
-import { normalizeRequests, requestText } from '@/lib/requests'
+import { normalizeRequests, requestText, validateDayRequests, MAX_TIME_RANGES } from '@/lib/requests'
 import { monthRange, weekday, WEEK_JA, cn, mainFacility } from '@/lib/utils'
 import { hhmm } from '@/lib/shift-kinds'
 import { REQUEST_LABEL } from '@/types'
@@ -53,9 +53,8 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
   const [selected, setSelected] = useState<Cell | null>(null)
   // 選択中のマスの下書き（複数選択）
   const [draft, setDraft] = useState<Set<RequestType>>(new Set())
-  const [useTime, setUseTime] = useState(false)
-  const [startT, setStartT] = useState('10:00')
-  const [endT, setEndT] = useState('15:00')
+  // 時間指定（1日2つまで）。空配列なら時間指定なし
+  const [times, setTimes] = useState<{ start: string; end: string }[]>([])
   const [pending, start] = useTransition()
 
   const facilityName = new Map(board.facilities.map(f => [f.id, f.name]))
@@ -73,9 +72,8 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
     if (!selKey) return
     const cur = reqs.get(selKey) ?? []
     setDraft(new Set(cur.filter(r => r.type !== 'custom' && r.type !== 'off').map(r => r.type)))
-    const c = cur.find(r => r.type === 'custom')
-    setUseTime(!!c)
-    if (c?.start_time && c.end_time) { setStartT(c.start_time.slice(0, 5)); setEndT(c.end_time.slice(0, 5)) }
+    setTimes(cur.filter(r => r.type === 'custom' && r.start_time && r.end_time)
+      .map(r => ({ start: r.start_time!.slice(0, 5), end: r.end_time!.slice(0, 5) })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selKey])
 
@@ -118,17 +116,24 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
     goNext(cell)
   }
 
-  const item = (cell: Cell, type: RequestType): BoardRequest => ({
+  const item = (cell: Cell, type: RequestType, t?: { start: string; end: string }): BoardRequest => ({
     staff_id: cell.staffId, date: cell.date, type,
-    start_time: type === 'custom' ? `${startT}:00` : null,
-    end_time:   type === 'custom' ? `${endT}:00`   : null,
+    start_time: type === 'custom' && t ? `${t.start}:00` : null,
+    end_time:   type === 'custom' && t ? `${t.end}:00`   : null,
   })
 
   const saveDraft = (cell: Cell) => {
-    if (useTime && startT === endT) { toast.error('時間指定の開始と終了が同じです'); return }
-    const items = [...Array.from(draft).map(t => item(cell, t)), ...(useTime ? [item(cell, 'custom')] : [])]
+    const items = [
+      ...Array.from(draft).map(t => item(cell, t)),
+      ...times.map(t => item(cell, 'custom', t)),
+    ]
+    const msg = validateDayRequests(items)
+    if (msg) { toast.error(msg); return }
     save(cell, items)
   }
+
+  const setTime = (i: number, patch: Partial<{ start: string; end: string }>) =>
+    setTimes(prev => prev.map((t, j) => (j === i ? { ...t, ...patch } : t)))
 
   const toggle = (t: RequestType) => setDraft(prev => {
     const next = new Set(prev)
@@ -212,7 +217,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                         >
                           {list.length === 0 ? '·' : requestText(list, { withTime: false })}
                           {list.filter(x => x.type === 'custom' && x.start_time).map(x => (
-                            <span key="t" className="block text-[9px] font-normal">{hhmm(x.start_time!)}-{hhmm(x.end_time!)}</span>
+                            <span key={x.start_time} className="block text-[9px] font-normal">{hhmm(x.start_time!)}-{hhmm(x.end_time!)}</span>
                           ))}
                         </button>
                       </td>
@@ -255,19 +260,30 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                   {draft.has(t) ? '✓ ' : ''}{REQUEST_LABEL[t]}
                 </button>
               ))}
-              <span className="inline-flex items-center gap-1 pl-2 border-l border-hs-border">
-                <button onClick={() => setUseTime(v => !v)} aria-pressed={useTime}
-                  className={cn('h-10 px-3 rounded-btn text-sm font-medium border-2',
-                    useTime ? `${TYPE_STYLE.custom} border-hs-blue` : 'bg-white text-hs-text-sub border-hs-border')}>
-                  {useTime ? '✓ ' : ''}時間指定
-                </button>
-                <input type="time" value={startT} onChange={e => { setStartT(e.target.value); setUseTime(true) }} step={900}
-                  className="h-10 px-2 rounded-btn border border-hs-input-border text-base md:text-sm" aria-label="開始" />
-                <span className="text-hs-text-sub">〜</span>
-                <input type="time" value={endT} onChange={e => { setEndT(e.target.value); setUseTime(true) }} step={900}
-                  className="h-10 px-2 rounded-btn border border-hs-input-border text-base md:text-sm" aria-label="終了" />
+              <span className="inline-flex flex-wrap items-center gap-1.5 pl-2 border-l border-hs-border">
+                {times.map((t, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 pl-2 pr-1 h-10 rounded-btn border-2 border-hs-blue bg-hs-gray-light">
+                    <span className="text-xs font-medium text-hs-text">時間{times.length > 1 ? i + 1 : ''}</span>
+                    <input type="time" value={t.start} onChange={e => setTime(i, { start: e.target.value })} step={900}
+                      className="h-8 px-1.5 rounded border border-hs-input-border bg-white text-base md:text-sm" aria-label={`時間指定${i + 1}の開始`} />
+                    <span className="text-hs-text-sub">〜</span>
+                    <input type="time" value={t.end} onChange={e => setTime(i, { end: e.target.value })} step={900}
+                      className="h-8 px-1.5 rounded border border-hs-input-border bg-white text-base md:text-sm" aria-label={`時間指定${i + 1}の終了`} />
+                    <button onClick={() => setTimes(prev => prev.filter((_, j) => j !== i))}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded text-hs-text-lighter hover:text-hs-danger" aria-label="この時間指定を外す">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))}
+                {times.length < MAX_TIME_RANGES && (
+                  <button
+                    onClick={() => setTimes(prev => [...prev, prev.length === 0 ? { start: '10:00', end: '15:00' } : { start: '17:00', end: '22:00' }])}
+                    className="h-10 px-3 rounded-btn text-sm font-medium border-2 border-dashed border-hs-border bg-white text-hs-text-sub hover:border-hs-blue hover:text-hs-blue">
+                    ＋ 時間指定{times.length > 0 ? '（2つ目）' : ''}
+                  </button>
+                )}
               </span>
-              <button onClick={() => saveDraft(selected)} disabled={draft.size === 0 && !useTime}
+              <button onClick={() => saveDraft(selected)} disabled={draft.size === 0 && times.length === 0}
                 className="h-10 px-4 rounded-btn bg-hs-blue hover:bg-hs-blue-hover text-white text-sm font-medium disabled:opacity-40">
                 決定して次の日へ
               </button>
@@ -283,7 +299,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                 </button>
               </span>
             </div>
-            <p className="text-[11px] text-hs-text-lighter mt-2">朝・夕・朝夕・夜・時間指定は複数選べます（例：朝と夜のどちらでも可）。「休」「消す」は押すとすぐ保存して次の日へ進みます。</p>
+            <p className="text-[11px] text-hs-text-lighter mt-2">朝・夕・朝夕・夜は複数選べます（例：朝と夜のどちらでも可）。時間指定は2つまで（例：8:00〜13:00と14:30〜22:00）。「休」「消す」は押すとすぐ保存して次の日へ進みます。</p>
           </div>
         </div>
       )}
