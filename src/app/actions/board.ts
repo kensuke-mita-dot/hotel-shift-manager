@@ -329,7 +329,7 @@ export async function setDayRequestsAsAdmin(input: {
     const { error } = await supabase.from('shift_requests').insert(rows)
     if (error) {
       if (/duplicate|unique/i.test(error.message)) {
-        return { error: '1日に複数の希望を入れるには、Supabase で 006_multi_requests.sql の実行が必要です' }
+        return { error: '時間指定を2つ入れるには、Supabase で 007_two_time_ranges.sql の実行が必要です' }
       }
       return { error: error.message }
     }

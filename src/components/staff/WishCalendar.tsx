@@ -7,7 +7,7 @@ import { saveAndSubmitRequests } from '@/app/actions/requests'
 import type { RequestType, ShiftRequest, FacilitySlot } from '@/types'
 import { REQUEST_LABEL } from '@/types'
 import { fmtTimeRange } from '@/lib/time'
-import { normalizeRequests, requestText } from '@/lib/requests'
+import { normalizeRequests, requestText, validateDayRequests, MAX_TIME_RANGES } from '@/lib/requests'
 
 // ─── Calendar ────────────────────────────────────────────────────
 
@@ -250,7 +250,7 @@ export function WishCalendar({
             const ds = dateStr(d)
             const list = local.get(ds) ?? []
             const isOff = list.some(e => e.type === 'off')
-            const custom = list.find(e => e.type === 'custom')
+            const customs = list.filter(e => e.type === 'custom' && e.start_time && e.end_time)
             const dow = dowOfDay(d)
             const bg = isOff ? 'bg-[#fdf0e6]' : list.length ? 'bg-[#eaf4fd]' : 'bg-white'
             const dayColor = dow === 0 ? 'text-hs-danger' : dow === 6 ? 'text-hs-blue' : 'text-hs-text'
@@ -270,11 +270,11 @@ export function WishCalendar({
                     <span className={`block text-xs font-bold leading-[1.25] ${isOff ? 'text-orange-500' : 'text-hs-blue'}`}>
                       {requestText(list, { withTime: false })}
                     </span>
-                    {custom?.start_time && custom.end_time && (
-                      <span className="block text-[10px] font-medium text-hs-blue/60 leading-[1.25] mt-[2px] whitespace-nowrap overflow-hidden">
-                        {fmtTimeRange(custom.start_time, custom.end_time)}
+                    {customs.map(c => (
+                      <span key={c.start_time} className="block text-[10px] font-medium text-hs-blue/60 leading-[1.25] mt-[2px] whitespace-nowrap overflow-hidden">
+                        {fmtTimeRange(c.start_time!, c.end_time!)}
                       </span>
-                    )}
+                    ))}
                   </div>
                 )}
               </button>
@@ -380,19 +380,28 @@ function WishPicker({ current, slotOptions, onDone, onClear }: {
   const [picked, setPicked] = useState<Set<RequestType>>(
     () => new Set(current.filter(e => e.type !== 'custom' && e.type !== 'off').map(e => e.type)),
   )
-  const cur = current.find(e => e.type === 'custom')
-  const [custom, setCustom] = useState<{ start: string; end: string } | null>(
-    cur?.start_time && cur.end_time ? { start: cur.start_time, end: cur.end_time } : null,
+  // 時間指定は2つまで（例：08:00-13:00 と 14:30-22:00）
+  const [customs, setCustoms] = useState<{ start: string; end: string }[]>(
+    () => current.filter(e => e.type === 'custom' && e.start_time && e.end_time)
+      .map(e => ({ start: e.start_time!, end: e.end_time! })),
   )
-  const [showTimePicker, setShowTimePicker] = useState(false)
+  // 編集中の時間指定（-1 は追加）
+  const [editing, setEditing] = useState<number | null>(null)
 
-  if (showTimePicker) {
+  if (editing !== null) {
+    const base = editing >= 0 ? customs[editing] : null
     return (
       <TimePicker
-        initialStart={custom?.start ?? '09:00:00'}
-        initialEnd={custom?.end ?? '17:00:00'}
-        onConfirm={(s, e) => { setCustom({ start: s, end: e }); setShowTimePicker(false) }}
-        onBack={() => setShowTimePicker(false)}
+        initialStart={base?.start ?? (customs.length ? '17:00:00' : '09:00:00')}
+        initialEnd={base?.end ?? (customs.length ? '22:00:00' : '17:00:00')}
+        onConfirm={(s, e) => {
+          const next = editing >= 0 ? customs.map((c, i) => (i === editing ? { start: s, end: e } : c)) : [...customs, { start: s, end: e }]
+          const msg = validateDayRequests(next.map(c => ({ type: 'custom' as RequestType, start_time: c.start, end_time: c.end })))
+          if (msg) { toast.error(msg); return }
+          setCustoms(next.sort((a, b) => a.start.localeCompare(b.start)))
+          setEditing(null)
+        }}
+        onBack={() => setEditing(null)}
       />
     )
   }
@@ -404,16 +413,16 @@ function WishPicker({ current, slotOptions, onDone, onClear }: {
   })
 
   const multi = slotOptions.filter(o => o.type !== 'custom' && o.type !== 'off')
-  const hasAny = picked.size > 0 || !!custom
+  const hasAny = picked.size > 0 || customs.length > 0
 
   const done = () => onDone([
     ...Array.from(picked).map(type => ({ type })),
-    ...(custom ? [{ type: 'custom' as RequestType, start_time: custom.start, end_time: custom.end }] : []),
+    ...customs.map(c => ({ type: 'custom' as RequestType, start_time: c.start, end_time: c.end })),
   ])
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-hs-text-sub">入れる時間帯をすべて選んでください（例：朝と夜のどちらでも可なら両方）。</p>
+      <p className="text-xs text-hs-text-sub">入れる時間帯をすべて選んでください（例：朝と夜のどちらでも可なら両方）。時間指定は2つまで入れられます。</p>
       <div className="flex flex-wrap gap-2">
         {multi.map(({ type, label, timeLabel }) => {
           const on = picked.has(type)
@@ -430,17 +439,24 @@ function WishPicker({ current, slotOptions, onDone, onClear }: {
             </button>
           )
         })}
-        <button
-          onClick={() => setShowTimePicker(true)}
-          aria-pressed={!!custom}
-          className={`flex flex-col items-center justify-center min-h-[64px] px-4 rounded-btn border-2 transition-colors min-w-[64px]
-            ${custom ? 'border-hs-blue bg-hs-blue-bg text-hs-blue' : 'border-hs-border text-hs-text hover:border-hs-blue hover:text-hs-blue'}`}
-        >
-          <span className="text-sm font-semibold">{custom ? '✓ ' : ''}時間指定</span>
-          {custom && <span className="text-[10px] text-hs-text-sub mt-0.5">{fmtTimeRange(custom.start, custom.end)}</span>}
-        </button>
-        {custom && (
-          <button onClick={() => setCustom(null)} className="self-center text-xs text-hs-text-sub underline">時間指定を外す</button>
+        {customs.map((c, i) => (
+          <span key={c.start} className="inline-flex items-center rounded-btn border-2 border-hs-blue bg-hs-blue-bg text-hs-blue">
+            <button onClick={() => setEditing(i)} className="flex flex-col items-center justify-center min-h-[60px] px-3">
+              <span className="text-sm font-semibold">✓ 時間{customs.length > 1 ? i + 1 : '指定'}</span>
+              <span className="text-[10px] text-hs-text-sub mt-0.5">{fmtTimeRange(c.start, c.end)}</span>
+            </button>
+            <button onClick={() => setCustoms(prev => prev.filter((_, j) => j !== i))}
+              className="h-full px-2 text-hs-text-lighter hover:text-hs-danger" aria-label="この時間指定を外す">×</button>
+          </span>
+        ))}
+        {customs.length < MAX_TIME_RANGES && (
+          <button
+            onClick={() => setEditing(-1)}
+            className="flex flex-col items-center justify-center min-h-[64px] px-4 rounded-btn border-2 border-dashed border-hs-border text-hs-text hover:border-hs-blue hover:text-hs-blue min-w-[64px]"
+          >
+            <span className="text-sm font-semibold">＋ 時間指定</span>
+            {customs.length > 0 && <span className="text-[10px] text-hs-text-sub mt-0.5">2つ目</span>}
+          </button>
         )}
       </div>
 

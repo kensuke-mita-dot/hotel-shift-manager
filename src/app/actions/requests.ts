@@ -109,7 +109,7 @@ export async function saveAndSubmitRequests(
     const { error } = await supabase.from('shift_requests').insert(rows)
     if (error) {
       if (/duplicate|unique/i.test(error.message)) {
-        return { error: '1日に複数の希望を出す準備がまだできていません。管理者に連絡してください' }
+        return { error: '時間指定を2つ出す準備がまだできていません。管理者に連絡してください' }
       }
       return { error: error.message }
     }
