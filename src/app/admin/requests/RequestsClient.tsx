@@ -160,11 +160,11 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
         <table className="text-xs border-separate border-spacing-0 w-full">
           <thead>
             <tr className="bg-hs-gray-lighter">
-              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border w-[128px] min-w-[128px]">スタッフ</th>
+              <th className="sticky top-0 left-0 z-30 bg-hs-gray-lighter text-left px-3 py-2 font-medium text-hs-text-sub border-b border-hs-border w-[96px] min-w-[96px]">スタッフ</th>
               {dates.map(d => {
                 const wd = weekday(d)
                 return (
-                  <th key={d} className={cn('sticky top-0 z-20 bg-hs-gray-lighter px-0.5 py-1 font-medium border-b border-l border-hs-border min-w-[34px]',
+                  <th key={d} className={cn('sticky top-0 z-20 bg-hs-gray-lighter px-0.5 py-1 font-medium border-b border-l border-hs-border min-w-[32px]',
                     wd === 0 ? 'text-hs-danger' : wd === 6 ? 'text-hs-blue' : 'text-hs-text-sub')}>
                     <div>{Number(d.slice(8))}</div>
                     <div className="text-[10px]">{WEEK_JA[wd]}</div>
@@ -188,14 +188,13 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                   </tr>
                 )}
                 <tr>
-                  <td className="sticky left-0 z-10 bg-white px-3 py-1.5 border-b border-hs-border whitespace-nowrap">
+                  <td className="sticky left-0 z-10 bg-white px-2.5 py-1.5 border-b border-hs-border whitespace-nowrap">
                     <div className="text-hs-text">
                       {s.fullName}
                       {s.isAdmin && <span className="ml-1 text-[10px] text-hs-text-lighter">管理者</span>}
                     </div>
                     <div className={cn('text-[10px]', sub?.submitted_at ? 'text-green-700' : 'text-hs-text-lighter')}>
-                      {s.loginId && <span className="font-mono text-hs-text-lighter mr-1.5">{s.loginId}</span>}
-                      {sub?.submitted_at ? '本人提出済' : '本人未提出'}
+                      {sub?.submitted_at ? '提出済' : '未提出'}
                     </div>
                   </td>
                   {dates.map(d => {
