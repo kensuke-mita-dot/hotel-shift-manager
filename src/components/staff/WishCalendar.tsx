@@ -8,27 +8,23 @@ import type { RequestType, ShiftRequest, FacilitySlot } from '@/types'
 import { REQUEST_LABEL } from '@/types'
 import { fmtTimeRange } from '@/lib/time'
 
-// ─── Calendar constants (December 2026) ─────────────────────────
+// ─── Calendar ────────────────────────────────────────────────────
 
-const YEAR = 2026
-const MONTH = 12
-const DAYS_IN_MONTH = 31
-const FIRST_DOW = new Date(YEAR, MONTH - 1, 1).getDay()  // 2 = Tuesday
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土']
 
-const CALENDAR_CELLS: (number | null)[] = (() => {
-  const cells: (number | null)[] = Array(FIRST_DOW).fill(null)
-  for (let d = 1; d <= DAYS_IN_MONTH; d++) cells.push(d)
+/** 'YYYY-MM' からカレンダーを組み立てる */
+function buildCalendar(month: string) {
+  const [year, mon] = month.split('-').map(Number)
+  const days = new Date(Date.UTC(year, mon, 0)).getUTCDate()
+  const firstDow = new Date(Date.UTC(year, mon - 1, 1)).getUTCDay()
+  const cells: (number | null)[] = Array(firstDow).fill(null)
+  for (let d = 1; d <= days; d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
-  return cells
-})()
-
-function dateStr(d: number) {
-  return `${YEAR}-${String(MONTH).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-}
-
-function dowOfDay(d: number) {
-  return (FIRST_DOW + d - 1) % 7
+  return {
+    year, mon, days, cells,
+    dateStr: (d: number) => `${year}-${String(mon).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+    dowOfDay: (d: number) => (firstDow + d - 1) % 7,
+  }
 }
 
 // ─── Time helpers ────────────────────────────────────────────────
@@ -61,6 +57,10 @@ interface SlotOption {
 }
 
 interface Props {
+  /** 対象月 'YYYY-MM' */
+  month: string
+  /** 希望を出せる月（切り替え用） */
+  months: string[]
   initialRequests: ShiftRequest[]
   submittedAt: string | null
   extendedUntil: string | null
@@ -72,6 +72,8 @@ interface Props {
 // ─── WishCalendar ────────────────────────────────────────────────
 
 export function WishCalendar({
+  month,
+  months,
   initialRequests,
   submittedAt: initialSubmittedAt,
   extendedUntil,
@@ -79,6 +81,10 @@ export function WishCalendar({
   availableSlotKeys,
   deadlineDate,
 }: Props) {
+  const cal = buildCalendar(month)
+  const DAYS_IN_MONTH = cal.days
+  const dateStr = cal.dateStr
+  const dowOfDay = cal.dowOfDay
   const [local, setLocal] = useState<Map<string, RequestEntry>>(() => {
     const m = new Map<string, RequestEntry>()
     for (const r of initialRequests) {
@@ -98,11 +104,11 @@ export function WishCalendar({
   const isLocked = new Date() > (extended ?? deadline)
 
   // Deadline label
-  const dl = new Date(deadlineDate)
+  const dl = new Date(deadlineDate + 'T00:00:00')
   const dlLabel = `${dl.getMonth() + 1}/${dl.getDate()}（${DAY_NAMES[dl.getDay()]}）`
   const extLabel = (() => {
     if (!extendedUntil) return null
-    const ed = new Date(extendedUntil)
+    const ed = new Date(extendedUntil + 'T00:00:00')
     return `→ 延長 ${ed.getMonth() + 1}/${ed.getDate()}（${DAY_NAMES[ed.getDay()]}）まで`
   })()
 
@@ -162,7 +168,7 @@ export function WishCalendar({
       const entries = Array.from(local.entries()).map(([date, e]) => ({
         date, type: e.type, start_time: e.start_time, end_time: e.end_time,
       }))
-      const result = await saveAndSubmitRequests(entries)
+      const result = await saveAndSubmitRequests(month, entries)
       if (result.error) {
         toast.error(result.error)
       } else {
@@ -182,12 +188,28 @@ export function WishCalendar({
             希望入力 · 提出期限 {dlLabel}
             {extLabel && <span className="ml-1 text-orange-500 font-medium">{extLabel}</span>}
           </p>
-          <h2 className="text-xl font-semibold text-hs-text mt-0.5">2026年12月</h2>
+          <h2 className="text-xl font-semibold text-hs-text mt-0.5">{cal.year}年{cal.mon}月</h2>
         </div>
         <span className={`shrink-0 text-xs font-medium px-2 py-1 rounded-chip border ${statusTag.cls}`}>
           {statusTag.text}
         </span>
       </div>
+
+      {/* ─── 月の切り替え ─── */}
+      {months.length > 1 && (
+        <div className="px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          {months.map(m => {
+            const active = m === month
+            return (
+              <a key={m} href={`/staff/requests?month=${m}`}
+                className={`shrink-0 px-3 h-8 inline-flex items-center rounded-chip border text-sm
+                  ${active ? 'bg-hs-blue text-white border-hs-blue' : 'bg-white text-hs-text-sub border-hs-border'}`}>
+                {Number(m.slice(5))}月
+              </a>
+            )
+          })}
+        </div>
+      )}
 
       {/* ─── 期限切れバナー ─── */}
       {isLocked && (
@@ -214,7 +236,7 @@ export function WishCalendar({
 
         {/* カレンダーグリッド */}
         <div className="grid grid-cols-7">
-          {CALENDAR_CELLS.map((d, i) => {
+          {cal.cells.map((d, i) => {
             if (!d) {
               return <div key={`pad-${i}`} className="border-b border-r border-hs-border h-[72px]" />
             }

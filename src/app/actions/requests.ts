@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase-server'
 import type { RequestType, ShiftRequest, FacilitySlot } from '@/types'
-import { nextMonthJST, currentMonthJST, monthRange } from '@/lib/utils'
+import { nextMonthJST, monthRange } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 
 export interface RequestsPageData {
@@ -14,12 +14,33 @@ export interface RequestsPageData {
   deadlineDate: string
 }
 
-export async function fetchRequestsData(userId: string): Promise<RequestsPageData> {
+/** スタッフが希望を出せる月：来月から3か月分 */
+export async function requestMonths(): Promise<string[]> {
+  return requestMonthList()
+}
+
+function requestMonthList(): string[] {
+  const [y, m] = nextMonthJST().split('-').map(Number)
+  return [0, 1, 2].map(i => {
+    const t = new Date(Date.UTC(y, m - 1 + i, 1))
+    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}`
+  })
+}
+
+/** 対象月の提出期限（前月15日） */
+function deadlineFor(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 2, 15))
+  return t.toISOString().slice(0, 10)
+}
+
+export async function fetchRequestsData(userId: string, month: string): Promise<RequestsPageData> {
   const supabase = createClient()
+  const { from, to } = monthRange(month)
 
   const [requestsRes, submissionRes, facilitiesRes] = await Promise.all([
-    supabase.from('shift_requests').select('*').eq('staff_id', userId).gte('date', monthRange(nextMonthJST()).from).lte('date', monthRange(nextMonthJST()).to),
-    supabase.from('request_submissions').select('submitted_at, extended_until').eq('staff_id', userId).eq('month', `${nextMonthJST()}-01`).maybeSingle(),
+    supabase.from('shift_requests').select('*').eq('staff_id', userId).gte('date', from).lte('date', to),
+    supabase.from('request_submissions').select('submitted_at, extended_until').eq('staff_id', userId).eq('month', `${month}-01`).maybeSingle(),
     supabase.from('staff_facilities').select('facility_id, is_primary').eq('staff_id', userId),
   ])
 
@@ -45,24 +66,28 @@ export async function fetchRequestsData(userId: string): Promise<RequestsPageDat
     extendedUntil: submissionRes.data?.extended_until ?? null,
     primaryFacilitySlots,
     availableSlotKeys,
-    deadlineDate: `${currentMonthJST()}-15`,  // 翌月分の提出期限は今月15日
+    deadlineDate: deadlineFor(month),
   }
 }
 
 export async function saveAndSubmitRequests(
+  month: string,
   entries: { date: string; type: RequestType; start_time?: string | null; end_time?: string | null }[],
 ): Promise<{ error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: '認証エラー' }
+  if (!requestMonthList().includes(month)) return { error: 'この月の希望は出せません' }
+  const { from, to } = monthRange(month)
+  if (entries.some(e => e.date < from || e.date > to)) return { error: '対象月以外の日付が含まれています' }
 
   // 当月分を全削除してから挿入（空欄になった日の削除漏れを防ぐ）
   const { error: delError } = await supabase
     .from('shift_requests')
     .delete()
     .eq('staff_id', user.id)
-    .gte('date', monthRange(nextMonthJST()).from)
-    .lte('date', monthRange(nextMonthJST()).to)
+    .gte('date', from)
+    .lte('date', to)
   if (delError) return { error: delError.message }
 
   if (entries.length > 0) {
@@ -77,7 +102,7 @@ export async function saveAndSubmitRequests(
     if (error) return { error: error.message }
   }
 
-  const { error: submitError } = await supabase.rpc('submit_requests', { p_month: `${nextMonthJST()}-01` })
+  const { error: submitError } = await supabase.rpc('submit_requests', { p_month: `${month}-01` })
   if (submitError) return { error: submitError.message }
 
   revalidatePath('/staff/requests')
