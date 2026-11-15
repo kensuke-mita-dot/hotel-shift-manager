@@ -16,7 +16,7 @@ import {
   type StaffPayInfo,
 } from '@/app/actions/staff'
 import { REQUESTS_ENABLED } from '@/types'
-import { yen } from '@/lib/utils'
+import { yen, nextMonthJST } from '@/lib/utils'
 import type { Facility, UserRole } from '@/types'
 
 const AVATAR_COLORS = [
@@ -350,7 +350,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">名前</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">所属施設・時給</th>
                 {REQUESTS_ENABLED && <>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">希望の提出状況</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">{Number(nextMonthJST().slice(5))}月の希望</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">期限延長</th>
                 </>}
                 <th className="px-4 py-3" />

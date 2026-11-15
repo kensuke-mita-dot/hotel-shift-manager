@@ -1,10 +1,14 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
-import { fetchRequestsData } from '@/app/actions/requests'
+import { fetchRequestsData, requestMonths } from '@/app/actions/requests'
 import { WishCalendar } from '@/components/staff/WishCalendar'
 import { REQUESTS_ENABLED } from '@/types'
 
-export default async function RequestsPage() {
+export default async function RequestsPage({
+  searchParams,
+}: {
+  searchParams: { month?: string }
+}) {
   // 希望は別ツールで集めるため、当面は確定シフトへ
   if (!REQUESTS_ENABLED) redirect('/staff/schedule')
 
@@ -12,10 +16,15 @@ export default async function RequestsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const data = await fetchRequestsData(user.id)
+  const months = await requestMonths()
+  const month  = months.includes(searchParams.month ?? '') ? searchParams.month! : months[0]
+  const data   = await fetchRequestsData(user.id, month)
 
   return (
     <WishCalendar
+      key={month}
+      month={month}
+      months={months}
       initialRequests={data.requests}
       submittedAt={data.submittedAt}
       extendedUntil={data.extendedUntil}

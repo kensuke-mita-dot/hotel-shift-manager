@@ -29,21 +29,24 @@ function AdminTabsInner() {
   const isMonthly = pathname.startsWith('/admin/monthly')
   const isStaff   = pathname.startsWith('/admin/staff')
   const isCost    = pathname.startsWith('/admin/cost')
+  const isReqs    = pathname.startsWith('/admin/requests')
 
   // タブリンク（施設パラメータを引き継ぐ）
   const dailyHref   = `/admin/daily?facility=${facility}&date=${date}`
   const monthlyHref = `/admin/monthly?facility=${facility}&month=${month}`
   const staffHref   = '/admin/staff'
   const costHref    = `/admin/cost?month=${month}`
+  const reqsHref    = `/admin/requests?facility=${facility}&month=${month}`
 
   // 施設切り替えリンク（ページ・日付・月を引き継ぐ）
   const facilityHref = (param: string) => {
     if (isDaily)   return `/admin/daily?facility=${param}&date=${date}`
     if (isMonthly) return `/admin/monthly?facility=${param}&month=${month}`
+    if (isReqs)    return `/admin/requests?facility=${param}&month=${month}`
     return `?facility=${param}`
   }
 
-  const showFacilitySwitcher = isDaily || isMonthly
+  const showFacilitySwitcher = isDaily || isMonthly || isReqs
 
   return (
     <div className="sticky top-14 z-20 bg-white border-b border-hs-border">
@@ -51,6 +54,7 @@ function AdminTabsInner() {
       <div className="flex px-2">
         <TabLink href={dailyHref}   active={isDaily}>日次調整</TabLink>
         <TabLink href={monthlyHref} active={isMonthly}>月間</TabLink>
+        <TabLink href={reqsHref}    active={isReqs}>希望</TabLink>
         <TabLink href={costHref}    active={isCost}>人件費</TabLink>
         <TabLink href={staffHref}   active={isStaff}>スタッフ</TabLink>
       </div>

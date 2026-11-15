@@ -155,9 +155,9 @@ export interface Violation {
 // ─── 希望入力 ─────────────────────────────────────────────
 /**
  * スタッフの希望入力（提出・期限延長）を使うか。
- * 当面は別ツールで希望を集めて管理者が手入力するため false（タブ・列を隠す）。
+ * false にするとスタッフ側の希望入力タブ、スタッフ管理の提出状況・期限延長の列を隠す。
  */
-export const REQUESTS_ENABLED = false
+export const REQUESTS_ENABLED = true
 
 /** 希望入力の略称ラベル */
 export const REQUEST_LABEL: Record<RequestType, string> = {
