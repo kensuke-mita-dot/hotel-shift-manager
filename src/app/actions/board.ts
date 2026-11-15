@@ -8,6 +8,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { addDays, monthRange, facilityRank, mainFacility, compareByLoginId } from '@/lib/utils'
 import { KIND_BOTH, KIND_CUSTOM, bothTimes } from '@/lib/shift-kinds'
 import type { Facility, FacilitySlot, RequestType } from '@/types'
+import { validateDayRequests } from '@/lib/requests'
 
 export interface BoardStaff {
   id: string
@@ -296,37 +297,42 @@ export async function fetchRequestBoard(month: string): Promise<RequestBoard> {
 
 const REQUEST_TYPES: RequestType[] = ['morning', 'evening', 'both', 'night', 'off', 'custom']
 
-/** 管理者がスタッフの希望を入力・変更・削除する（type = null で削除）。提出期限に関係なく書ける */
-export async function setRequestAsAdmin(input: {
+/** 管理者がスタッフの1日分の希望をまとめて置き換える（空配列で削除）。提出期限に関係なく書ける */
+export async function setDayRequestsAsAdmin(input: {
   staffId: string
   date: string
-  type: RequestType | null
-  start?: string
-  end?: string
+  items: { type: RequestType; start?: string; end?: string }[]
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin()
   if ('error' in guard) return { error: guard.error }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { error: '日付が不正です' }
 
+  const rows = input.items.map(i => ({
+    staff_id: input.staffId,
+    date: input.date,
+    type: i.type,
+    start_time: i.type === 'custom' ? i.start ?? null : null,
+    end_time:   i.type === 'custom' ? i.end ?? null : null,
+  }))
+  if (rows.some(r => !REQUEST_TYPES.includes(r.type))) return { error: '希望の種類が不正です' }
+  if (rows.some(r => r.type === 'custom' && (!TIME.test(r.start_time ?? '') || !TIME.test(r.end_time ?? '')))) {
+    return { error: '時間指定は開始と終了の時刻を入れてください' }
+  }
+  const msg = validateDayRequests(rows)
+  if (msg) return { error: msg }
+
   const supabase = createClient()
-  if (input.type === null) {
-    const { error } = await supabase.from('shift_requests').delete()
-      .eq('staff_id', input.staffId).eq('date', input.date)
-    if (error) return { error: error.message }
-  } else {
-    if (!REQUEST_TYPES.includes(input.type)) return { error: '希望の種類が不正です' }
-    const custom = input.type === 'custom'
-    if (custom && (!input.start || !input.end || !TIME.test(input.start) || !TIME.test(input.end) || input.start === input.end)) {
-      return { error: '時間指定は開始と終了の時刻を入れてください' }
+  const { error: delErr } = await supabase.from('shift_requests').delete()
+    .eq('staff_id', input.staffId).eq('date', input.date)
+  if (delErr) return { error: delErr.message }
+  if (rows.length > 0) {
+    const { error } = await supabase.from('shift_requests').insert(rows)
+    if (error) {
+      if (/duplicate|unique/i.test(error.message)) {
+        return { error: '1日に複数の希望を入れるには、Supabase で 006_multi_requests.sql の実行が必要です' }
+      }
+      return { error: error.message }
     }
-    const { error } = await supabase.from('shift_requests').upsert({
-      staff_id: input.staffId,
-      date: input.date,
-      type: input.type,
-      start_time: custom ? input.start : null,
-      end_time: custom ? input.end : null,
-    }, { onConflict: 'staff_id,date' })
-    if (error) return { error: error.message }
   }
   revalidatePath('/admin', 'layout')
   return {}

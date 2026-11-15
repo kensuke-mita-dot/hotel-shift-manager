@@ -9,7 +9,7 @@ import { addShift, removeShift, type DayBoard, type BoardShift, type BoardStaff 
 import { boardRows, kindLabel, hhmm, KIND_COLOR, KIND_CUSTOM, type BoardRow } from '@/lib/shift-kinds'
 import { runAllChecks, coversSlot, type Violation } from '@/lib/rules'
 import { addDays, weekday, WEEK_JA, cn } from '@/lib/utils'
-import { REQUEST_LABEL } from '@/types'
+import { requestText } from '@/lib/requests'
 import type { Facility, FacilitySlot } from '@/types'
 
 export function DailyClient({ board, facility }: { board: DayBoard; facility: string }) {
@@ -19,7 +19,12 @@ export function DailyClient({ board, facility }: { board: DayBoard; facility: st
 
   const dayShifts = board.shifts.filter(s => s.date === date)
   const staffById = useMemo(() => new Map(board.staff.map(s => [s.id, s])), [board.staff])
-  const requestBy = useMemo(() => new Map(board.requests.map(r => [r.staff_id, r])), [board.requests])
+  // 希望は1日に複数あり得る（例：朝と夜）
+  const requestBy = useMemo(() => {
+    const m = new Map<string, DayBoard['requests']>()
+    for (const r of board.requests) m.set(r.staff_id, [...(m.get(r.staff_id) ?? []), r])
+    return m
+  }, [board.requests])
 
   const violations = useMemo(() => runAllChecks({
     shifts: board.shifts,
@@ -101,7 +106,7 @@ export function DailyClient({ board, facility }: { board: DayBoard; facility: st
                     {s.isAdmin && <span className="ml-1 text-[10px] text-hs-text-lighter">管理者</span>}
                   </span>
                   <span className="text-xs text-hs-text-sub whitespace-nowrap">
-                    {r ? `希望：${REQUEST_LABEL[r.type]}${r.type === 'custom' && r.start_time ? ` ${hhmm(r.start_time)}-${hhmm(r.end_time!)}` : ''}` : s.facilityIds.join('・') || '施設未設定'}
+                    {r?.length ? `希望：${requestText(r)}` : s.facilityIds.join('・') || '施設未設定'}
                   </span>
                 </li>
               )
@@ -134,7 +139,7 @@ function FacilityCard(props: {
   allDayShifts: BoardShift[]
   staff: BoardStaff[]
   staffById: Map<string, BoardStaff>
-  requestBy: Map<string, DayBoard['requests'][number]>
+  requestBy: Map<string, DayBoard['requests']>
   violations: Violation[]
   facilities: Facility[]
   onChanged: () => void
@@ -190,7 +195,7 @@ function SlotRow(props: {
   allDayShifts: BoardShift[]
   staff: BoardStaff[]
   staffById: Map<string, BoardStaff>
-  requestBy: Map<string, DayBoard['requests'][number]>
+  requestBy: Map<string, DayBoard['requests']>
   facilities: Facility[]
   onChanged: () => void
 }) {
@@ -261,7 +266,7 @@ function AddForm(props: {
   date: string
   allDayShifts: BoardShift[]
   staff: BoardStaff[]
-  requestBy: Map<string, DayBoard['requests'][number]>
+  requestBy: Map<string, DayBoard['requests']>
   facilities: Facility[]
   onChanged: () => void
   onClose: () => void
@@ -281,7 +286,7 @@ function AddForm(props: {
   const describe = (s: BoardStaff) => {
     const parts: string[] = []
     const r = requestBy.get(s.id)
-    if (r) parts.push(`希望:${REQUEST_LABEL[r.type]}${r.type === 'custom' && r.start_time ? ` ${hhmm(r.start_time)}-${hhmm(r.end_time!)}` : ''}`)
+    if (r?.length) parts.push(`希望:${requestText(r)}`)
     const elsewhere = allDayShifts.filter(x => x.staff_id === s.id && x.facility_id !== facility.id)
     if (elsewhere.length) parts.push(`${elsewhere.map(x => x.facility_id).join('・')}に配置済`)
     if (showAll && !s.facilityIds.includes(facility.id)) parts.push(`所属:${s.facilityIds.join('・') || 'なし'}`)

@@ -7,6 +7,7 @@ import { saveAndSubmitRequests } from '@/app/actions/requests'
 import type { RequestType, ShiftRequest, FacilitySlot } from '@/types'
 import { REQUEST_LABEL } from '@/types'
 import { fmtTimeRange } from '@/lib/time'
+import { normalizeRequests, requestText } from '@/lib/requests'
 
 // ─── Calendar ────────────────────────────────────────────────────
 
@@ -85,10 +86,11 @@ export function WishCalendar({
   const DAYS_IN_MONTH = cal.days
   const dateStr = cal.dateStr
   const dowOfDay = cal.dowOfDay
-  const [local, setLocal] = useState<Map<string, RequestEntry>>(() => {
-    const m = new Map<string, RequestEntry>()
+  // 1日に複数の希望を持てる（例：朝と夜のどちらでも可）。「休」は単独
+  const [local, setLocal] = useState<Map<string, RequestEntry[]>>(() => {
+    const m = new Map<string, RequestEntry[]>()
     for (const r of initialRequests) {
-      m.set(r.date, { type: r.type, start_time: r.start_time, end_time: r.end_time })
+      m.set(r.date, [...(m.get(r.date) ?? []), { type: r.type, start_time: r.start_time, end_time: r.end_time }])
     }
     return m
   })
@@ -132,7 +134,7 @@ export function WishCalendar({
 
   // Counts
   const counts: Record<RequestType, number> = { morning: 0, evening: 0, both: 0, night: 0, custom: 0, off: 0 }
-  Array.from(local.values()).forEach(e => { counts[e.type]++ })
+  Array.from(local.values()).forEach(list => list.forEach(e => { counts[e.type]++ }))
   const emptyCount = DAYS_IN_MONTH - local.size
   const emptyDays = Array.from({ length: DAYS_IN_MONTH }, (_, i) => i + 1).filter(d => !local.has(dateStr(d)))
 
@@ -143,9 +145,14 @@ export function WishCalendar({
     setSelectedDate(dateStr(d))
   }
 
-  function handleSelect(type: RequestType, start_time?: string | null, end_time?: string | null) {
+  function handleSetDay(list: RequestEntry[]) {
     if (!selectedDate) return
-    setLocal(prev => new Map(prev).set(selectedDate, { type, start_time: start_time ?? null, end_time: end_time ?? null }))
+    const norm = normalizeRequests(list)
+    setLocal(prev => {
+      const next = new Map(prev)
+      if (norm.length) next.set(selectedDate, norm); else next.delete(selectedDate)
+      return next
+    })
     setIsDirty(true)
     setSelectedDate(null)
   }
@@ -165,9 +172,9 @@ export function WishCalendar({
   function doSubmit() {
     setShowConfirm(false)
     startTransition(async () => {
-      const entries = Array.from(local.entries()).map(([date, e]) => ({
+      const entries = Array.from(local.entries()).flatMap(([date, list]) => list.map(e => ({
         date, type: e.type, start_time: e.start_time, end_time: e.end_time,
-      }))
+      })))
       const result = await saveAndSubmitRequests(month, entries)
       if (result.error) {
         toast.error(result.error)
@@ -241,9 +248,11 @@ export function WishCalendar({
               return <div key={`pad-${i}`} className="border-b border-r border-hs-border h-[72px]" />
             }
             const ds = dateStr(d)
-            const entry = local.get(ds)
+            const list = local.get(ds) ?? []
+            const isOff = list.some(e => e.type === 'off')
+            const custom = list.find(e => e.type === 'custom')
             const dow = dowOfDay(d)
-            const bg = entry?.type === 'off' ? 'bg-[#fdf0e6]' : entry ? 'bg-[#eaf4fd]' : 'bg-white'
+            const bg = isOff ? 'bg-[#fdf0e6]' : list.length ? 'bg-[#eaf4fd]' : 'bg-white'
             const dayColor = dow === 0 ? 'text-hs-danger' : dow === 6 ? 'text-hs-blue' : 'text-hs-text'
 
             return (
@@ -256,14 +265,14 @@ export function WishCalendar({
                   transition-colors active:opacity-70 ${bg}`}
               >
                 <span className={`block text-xs font-medium leading-[1.25] ${dayColor}`}>{d}</span>
-                {entry && (
+                {list.length > 0 && (
                   <div className="mt-1">
-                    <span className={`block text-xs font-bold leading-[1.25] ${entry.type === 'off' ? 'text-orange-500' : 'text-hs-blue'}`}>
-                      {REQUEST_LABEL[entry.type]}
+                    <span className={`block text-xs font-bold leading-[1.25] ${isOff ? 'text-orange-500' : 'text-hs-blue'}`}>
+                      {requestText(list, { withTime: false })}
                     </span>
-                    {entry.type === 'custom' && entry.start_time && entry.end_time && (
-                      <span className="block text-xs font-medium text-hs-blue/60 leading-[1.25] mt-[2px] whitespace-nowrap overflow-hidden">
-                        {fmtTimeRange(entry.start_time, entry.end_time)}
+                    {custom?.start_time && custom.end_time && (
+                      <span className="block text-[10px] font-medium text-hs-blue/60 leading-[1.25] mt-[2px] whitespace-nowrap overflow-hidden">
+                        {fmtTimeRange(custom.start_time, custom.end_time)}
                       </span>
                     )}
                   </div>
@@ -303,12 +312,13 @@ export function WishCalendar({
           const d = new Date(selectedDate + 'T00:00:00')
           return `${d.getMonth() + 1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`
         })()}
-        title="希望を選択（施設は管理者が決めます）"
+        title="希望を選択（複数選べます）"
       >
         <WishPicker
-          currentEntry={selectedDate ? local.get(selectedDate) : undefined}
+          key={selectedDate ?? ''}
+          current={selectedDate ? local.get(selectedDate) ?? [] : []}
           slotOptions={slotOptions}
-          onSelect={handleSelect}
+          onDone={handleSetDay}
           onClear={handleClear}
         />
       </BottomSheet>
@@ -359,57 +369,106 @@ export function WishCalendar({
   )
 }
 
-// ─── WishPicker ──────────────────────────────────────────────────
+// ─── WishPicker（複数選択）────────────────────────────────────────
 
-function WishPicker({ currentEntry, slotOptions, onSelect, onClear }: {
-  currentEntry?: RequestEntry
+function WishPicker({ current, slotOptions, onDone, onClear }: {
+  current: RequestEntry[]
   slotOptions: SlotOption[]
-  onSelect: (type: RequestType, start_time?: string | null, end_time?: string | null) => void
+  onDone: (list: RequestEntry[]) => void
   onClear: () => void
 }) {
-  const [showTimePicker, setShowTimePicker] = useState(currentEntry?.type === 'custom')
+  const [picked, setPicked] = useState<Set<RequestType>>(
+    () => new Set(current.filter(e => e.type !== 'custom' && e.type !== 'off').map(e => e.type)),
+  )
+  const cur = current.find(e => e.type === 'custom')
+  const [custom, setCustom] = useState<{ start: string; end: string } | null>(
+    cur?.start_time && cur.end_time ? { start: cur.start_time, end: cur.end_time } : null,
+  )
+  const [showTimePicker, setShowTimePicker] = useState(false)
 
   if (showTimePicker) {
     return (
       <TimePicker
-        initialStart={currentEntry?.start_time ?? '09:00:00'}
-        initialEnd={currentEntry?.end_time ?? '17:00:00'}
-        onConfirm={(s, e) => onSelect('custom', s, e)}
+        initialStart={custom?.start ?? '09:00:00'}
+        initialEnd={custom?.end ?? '17:00:00'}
+        onConfirm={(s, e) => { setCustom({ start: s, end: e }); setShowTimePicker(false) }}
         onBack={() => setShowTimePicker(false)}
       />
     )
   }
 
+  const toggle = (t: RequestType) => setPicked(prev => {
+    const next = new Set(prev)
+    if (next.has(t)) next.delete(t); else next.add(t)
+    return next
+  })
+
+  const multi = slotOptions.filter(o => o.type !== 'custom' && o.type !== 'off')
+  const hasAny = picked.size > 0 || !!custom
+
+  const done = () => onDone([
+    ...Array.from(picked).map(type => ({ type })),
+    ...(custom ? [{ type: 'custom' as RequestType, start_time: custom.start, end_time: custom.end }] : []),
+  ])
+
   return (
     <div className="space-y-4">
+      <p className="text-xs text-hs-text-sub">入れる時間帯をすべて選んでください（例：朝と夜のどちらでも可なら両方）。</p>
       <div className="flex flex-wrap gap-2">
-        {slotOptions.map(({ type, label, timeLabel }) => {
-          const isSelected = currentEntry?.type === type
+        {multi.map(({ type, label, timeLabel }) => {
+          const on = picked.has(type)
           return (
             <button
               key={type}
-              onClick={() => type === 'custom' ? setShowTimePicker(true) : onSelect(type)}
+              onClick={() => toggle(type)}
+              aria-pressed={on}
               className={`flex flex-col items-center justify-center min-h-[64px] px-4 rounded-btn border-2 transition-colors min-w-[64px]
-                ${isSelected
-                  ? 'border-hs-blue bg-hs-blue-bg text-hs-blue'
-                  : 'border-hs-border text-hs-text hover:border-hs-blue hover:text-hs-blue'
-                }`}
+                ${on ? 'border-hs-blue bg-hs-blue-bg text-hs-blue' : 'border-hs-border text-hs-text hover:border-hs-blue hover:text-hs-blue'}`}
             >
-              <span className="text-sm font-semibold">{label}</span>
+              <span className="text-sm font-semibold">{on ? '✓ ' : ''}{label}</span>
               {timeLabel && <span className="text-[10px] text-hs-text-sub mt-0.5">{timeLabel}</span>}
             </button>
           )
         })}
+        <button
+          onClick={() => setShowTimePicker(true)}
+          aria-pressed={!!custom}
+          className={`flex flex-col items-center justify-center min-h-[64px] px-4 rounded-btn border-2 transition-colors min-w-[64px]
+            ${custom ? 'border-hs-blue bg-hs-blue-bg text-hs-blue' : 'border-hs-border text-hs-text hover:border-hs-blue hover:text-hs-blue'}`}
+        >
+          <span className="text-sm font-semibold">{custom ? '✓ ' : ''}時間指定</span>
+          {custom && <span className="text-[10px] text-hs-text-sub mt-0.5">{fmtTimeRange(custom.start, custom.end)}</span>}
+        </button>
+        {custom && (
+          <button onClick={() => setCustom(null)} className="self-center text-xs text-hs-text-sub underline">時間指定を外す</button>
+        )}
       </div>
 
-      {currentEntry && (
+      <button
+        onClick={done}
+        disabled={!hasAny}
+        className="w-full h-11 bg-hs-blue hover:bg-hs-blue-hover text-white rounded-btn text-sm font-medium disabled:opacity-40"
+      >
+        決定
+      </button>
+
+      <div className="flex gap-2">
         <button
-          onClick={onClear}
-          className="w-full h-10 border border-hs-border rounded-btn text-sm text-hs-text-sub hover:text-hs-danger hover:border-red-200 transition-colors"
+          onClick={() => onDone([{ type: 'off' }])}
+          className={`flex-1 h-11 rounded-btn text-sm font-medium border-2 transition-colors
+            ${current.some(e => e.type === 'off') ? 'border-orange-400 bg-[#fdf0e6] text-orange-600' : 'border-hs-border text-orange-600'}`}
         >
-          クリア
+          休み
         </button>
-      )}
+        {current.length > 0 && (
+          <button
+            onClick={onClear}
+            className="flex-1 h-11 border border-hs-border rounded-btn text-sm text-hs-text-sub hover:text-hs-danger hover:border-red-200 transition-colors"
+          >
+            クリア
+          </button>
+        )}
+      </div>
     </div>
   )
 }
