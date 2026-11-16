@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth-guard'
 import { monthRange } from '@/lib/utils'
 import { workMinutes } from '@/lib/shift-kinds'
+import { wageAt, PAID_LEAVE_HOURS } from '@/lib/pay'
 
 /** 深夜割増率（労基法の下限 25%） */
 const LATE_NIGHT_PREMIUM = 0.25
@@ -11,14 +12,17 @@ const LATE_NIGHT_PREMIUM = 0.25
 export interface CostRow {
   staffId: string
   fullName: string
+  /** 個別に設定された時給（0 なら施設の初期値で計算） */
   hourlyWage: number
+  usesDefaultWage: boolean
   transportType: 'per_shift' | 'monthly'
   transportAmount: number
   /** 施設ごとの内訳 */
   byFacility: Record<string, { shifts: number; minutes: number; pay: number; transport: number }>
   days: number
-  /** 有給の日数（給与には含めない） */
+  /** 有給の日数と賃金（所定時間×時給。給与 pay に含む） */
   paidLeaveDays: number
+  paidLeavePay: number
   minutes: number
   lateMinutes: number
   pay: number
@@ -59,36 +63,47 @@ export async function fetchCost(month: string): Promise<CostData> {
   const pays  = new Map((payRes.data ?? []).map(p => [p.staff_id, p]))
   const facilities = (fRes.data ?? []).map(f => ({ id: f.id as string, name: f.name as string }))
 
-  const rowMap = new Map<string, CostRow & { _dates: Map<string, string> }>()
-  const paidLeave = new Map<string, Set<string>>()
-  for (const s of shRes.data ?? []) {
-    // 休み・有給は給与計算の対象外（有給は日数だけ数える）
-    if (s.kind === 'off') continue
-    if (s.kind === 'paid_leave') {
-      const set = paidLeave.get(s.staff_id) ?? new Set<string>()
-      set.add(s.date)
-      paidLeave.set(s.staff_id, set)
-      continue
-    }
-    let r = rowMap.get(s.staff_id)
+  const rowMap = new Map<string, CostRow & { _dates: Map<string, string>; _leave: Set<string> }>()
+  const rowFor = (staffId: string) => {
+    let r = rowMap.get(staffId)
     if (!r) {
-      const p = pays.get(s.staff_id)
+      const p = pays.get(staffId)
       r = {
-        staffId: s.staff_id,
-        fullName: names.get(s.staff_id) ?? '（削除済み）',
+        staffId,
+        fullName: names.get(staffId) ?? '（削除済み）',
         hourlyWage: p?.hourly_wage ?? 0,
+        usesDefaultWage: !(p?.hourly_wage && p.hourly_wage > 0),
         transportType: (p?.transport_type ?? 'per_shift') as CostRow['transportType'],
         transportAmount: p?.transport_amount ?? 0,
-        byFacility: {}, days: 0, paidLeaveDays: 0, minutes: 0, lateMinutes: 0, pay: 0, transport: 0, total: 0,
-        _dates: new Map(),
+        byFacility: {}, days: 0, paidLeaveDays: 0, paidLeavePay: 0,
+        minutes: 0, lateMinutes: 0, pay: 0, transport: 0, total: 0,
+        _dates: new Map(), _leave: new Set(),
       }
-      rowMap.set(s.staff_id, r)
+      rowMap.set(staffId, r)
     }
-    const w   = workMinutes(s.start_time, s.end_time)
-    const pay = r.hourlyWage * (w.paid / 60) + r.hourlyWage * LATE_NIGHT_PREMIUM * (w.lateNight / 60)
-    const bf  = r.byFacility[s.facility_id] ?? { shifts: 0, minutes: 0, pay: 0, transport: 0 }
-    bf.shifts++; bf.minutes += w.paid; bf.pay += pay
+    return r
+  }
+
+  for (const s of shRes.data ?? []) {
+    // 休み：給与なし
+    if (s.kind === 'off') continue
+    const r = rowFor(s.staff_id)
+    const wage = wageAt(r.hourlyWage, s.facility_id)
+    const bf = r.byFacility[s.facility_id] ?? { shifts: 0, minutes: 0, pay: 0, transport: 0 }
     r.byFacility[s.facility_id] = bf
+
+    // 有給：所定時間×時給（同じ日に複数あっても1日分）。交通費なし
+    if (s.kind === 'paid_leave') {
+      if (r._leave.has(s.date)) continue
+      r._leave.add(s.date)
+      const pay = wage * PAID_LEAVE_HOURS
+      bf.pay += pay; r.pay += pay; r.paidLeavePay += pay
+      continue
+    }
+
+    const w   = workMinutes(s.start_time, s.end_time)
+    const pay = wage * (w.paid / 60) + wage * LATE_NIGHT_PREMIUM * (w.lateNight / 60)
+    bf.shifts++; bf.minutes += w.paid; bf.pay += pay
     r.minutes += w.paid; r.lateMinutes += w.lateNight; r.pay += pay
     // 交通費（1出勤あたり）は1日1回。同じ日に2施設なら最初の施設に計上
     if (!r._dates.has(s.date)) r._dates.set(s.date, s.facility_id)
@@ -97,7 +112,8 @@ export async function fetchCost(month: string): Promise<CostData> {
   const rows: CostRow[] = []
   rowMap.forEach(r => {
     r.days = r._dates.size
-    r.paidLeaveDays = paidLeave.get(r.staffId)?.size ?? 0
+    r.paidLeaveDays = r._leave.size
+    r.paidLeavePay = Math.round(r.paidLeavePay)
     if (r.transportType === 'per_shift') {
       r._dates.forEach(fid => { r.byFacility[fid].transport += r.transportAmount })
       r.transport = r.transportAmount * r.days
@@ -110,8 +126,8 @@ export async function fetchCost(month: string): Promise<CostData> {
     r.pay = Math.round(r.pay)
     Object.values(r.byFacility).forEach(b => { b.pay = Math.round(b.pay) })
     r.total = r.pay + r.transport
-    const { _dates, ...rest } = r
-    void _dates
+    const { _dates, _leave, ...rest } = r
+    void _dates; void _leave
     rows.push(rest)
   })
   rows.sort((a, b) => b.total - a.total)
@@ -138,6 +154,6 @@ export async function fetchCost(month: string): Promise<CostData> {
 
   return {
     month, facilities, rows, facilityTotals, total,
-    missingWage: rows.filter(r => r.hourlyWage === 0).map(r => r.fullName),
+    missingWage: rows.filter(r => r.usesDefaultWage).map(r => r.fullName),
   }
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { fetchCost } from '@/app/actions/cost'
+import { FACILITY_DEFAULT_WAGE, PAID_LEAVE_HOURS } from '@/lib/pay'
 import { yen, cn, nextMonthJST } from '@/lib/utils'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -48,11 +49,11 @@ export default async function CostPage({
       ) : (
         <>
           {data.missingWage.length > 0 && (
-            <div className="flex items-start gap-2 bg-hs-warn-bg border border-hs-warn/30 rounded-btn px-4 py-3 text-sm text-hs-warn">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 bg-hs-blue-bg border border-hs-border rounded-btn px-4 py-3 text-sm text-hs-text-sub">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-hs-text-lighter" />
               <div>
-                時給が未設定の人がいます（0円で計算中）：{data.missingWage.join('、')}
-                <Link href="/admin/staff" className="ml-2 underline underline-offset-2">スタッフで設定 →</Link>
+                時給を個別に設定していない人は、勤務した施設の初期時給（東京 {yen(FACILITY_DEFAULT_WAGE.BHJ)}・京都 {yen(FACILITY_DEFAULT_WAGE.BHKK)}・名古屋 {yen(FACILITY_DEFAULT_WAGE.MAHNM)}）で計算しています：{data.missingWage.join('、')}
+                <Link href="/admin/staff" className="ml-2 underline underline-offset-2">スタッフで個別に設定 →</Link>
               </div>
             </div>
           )}
@@ -118,14 +119,16 @@ export default async function CostPage({
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {r.days}日
-                        {r.paidLeaveDays > 0 && <span className="block text-[11px] text-hs-text-lighter">有給 {r.paidLeaveDays}日</span>}
+                        {r.paidLeaveDays > 0 && <span className="block text-[11px] text-hs-text-lighter">有給 {r.paidLeaveDays}日（{yen(r.paidLeavePay)}）</span>}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {hours(r.minutes)}
                         {r.lateMinutes > 0 && <span className="block text-[11px] text-hs-text-lighter">うち深夜 {hours(r.lateMinutes)}</span>}
                       </td>
-                      <td className={cn('px-3 py-2.5 text-right tabular-nums', r.hourlyWage === 0 && 'text-hs-warn')}>
-                        {r.hourlyWage === 0 ? '未設定' : yen(r.hourlyWage)}
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {r.usesDefaultWage
+                          ? <span className="text-hs-text-sub">施設の初期値</span>
+                          : yen(r.hourlyWage)}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{yen(r.pay)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
@@ -148,7 +151,8 @@ export default async function CostPage({
           <p className="text-xs text-hs-text-lighter leading-relaxed">
             計算の前提：実働＝勤務時間から休憩（6時間超は45分、8時間超は60分）を引いたもの。
             22時〜翌5時の勤務に深夜割増25%を加算（休憩は深夜帯以外で取る前提）。
-            交通費は「1出勤あたり」なら出勤日数分、「月額」は1日以上出勤した月に計上。残業・休日割増・社会保険料、有給休暇の賃金は含みません（有給は日数のみ表示）。
+            交通費は「1出勤あたり」なら出勤日数分、「月額」は1日以上出勤した月に計上。有給は1日あたり所定{PAID_LEAVE_HOURS}時間×時給で給与に含めます（交通費なし）。
+            時給は個別設定がなければ、勤務した施設の地域の初期時給を使います。残業・休日割増・社会保険料は含みません。
           </p>
         </>
       )}
