@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { setDayRequestsAsAdmin, type RequestBoard, type BoardRequest } from '@/app/actions/board'
@@ -36,7 +35,6 @@ const MULTI: RequestType[] = ['morning', 'evening', 'both', 'night']
 type Cell = { staffId: string; date: string }
 
 export function RequestsClient({ board, facility }: { board: RequestBoard; facility: string }) {
-  const router = useRouter()
   const { month } = board
   const [y, m] = month.split('-').map(Number)
   const { days } = monthRange(month)
@@ -112,7 +110,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
         })
         return
       }
-      router.refresh()
+      // 画面の更新はサーバー側の revalidatePath で自動的に届く
     })
     goNext(cell)
   }

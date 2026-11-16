@@ -39,10 +39,12 @@ export async function fetchRequestsData(userId: string, month: string): Promise<
   const supabase = createClient()
   const { from, to } = monthRange(month)
 
-  const [requestsRes, submissionRes, facilitiesRes] = await Promise.all([
+  // 枠は件数が少ないので全施設分を同時に取り、所属施設で絞る
+  const [requestsRes, submissionRes, facilitiesRes, slotsRes] = await Promise.all([
     supabase.from('shift_requests').select('*').eq('staff_id', userId).gte('date', from).lte('date', to),
     supabase.from('request_submissions').select('submitted_at, extended_until').eq('staff_id', userId).eq('month', `${month}-01`).maybeSingle(),
     supabase.from('staff_facilities').select('facility_id, is_primary').eq('staff_id', userId),
+    supabase.from('facility_slots').select('*'),
   ])
 
   const facilities = facilitiesRes.data ?? []
@@ -55,8 +57,7 @@ export async function fetchRequestsData(userId: string, month: string): Promise<
   let availableSlotKeys: string[] = []
 
   if (facilityIds.length > 0) {
-    const slotsRes = await supabase.from('facility_slots').select('*').in('facility_id', facilityIds)
-    const allSlots = (slotsRes.data ?? []) as FacilitySlot[]
+    const allSlots = ((slotsRes.data ?? []) as FacilitySlot[]).filter(s => facilityIds.includes(s.facility_id))
     primaryFacilitySlots = allSlots.filter(s => s.facility_id === primaryFacilityId)
     availableSlotKeys = Array.from(new Set(allSlots.map(s => s.key)))
   }

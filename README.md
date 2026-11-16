@@ -1,79 +1,29 @@
-# Hotel Shift Management System
+# HOTEL SHIFT
 
-ホテル特化型シフト管理ツール（MVP）
+dot Inc. の5施設（BHJ・MAHT・BHKK・MAHNM・MAHB）向けのシフト管理ツール。
 
-## 技術スタック
+- 本番：https://dot-hotel-shift.vercel.app （Vercel プロジェクト `dot-hotel-shift`、東京リージョン hnd1）
+- DB・認証：Supabase プロジェクト `hotel-shift-prod`（東京）
+- 構成：Next.js 14（App Router・Server Actions）＋ Supabase ＋ Tailwind CSS
 
-- **Next.js 14** (App Router)
-- **Tailwind CSS**
-- **shadcn/ui**
-- **Supabase** (Auth + PostgreSQL + RLS)
-- **date-fns** (日付操作)
-- **Lucide React** (アイコン)
+`main` に入ると Vercel が自動で本番に反映します。
 
 ---
 
-## セットアップ手順
+## できること
 
-### 1. プロジェクト作成
+| 画面 | パス | 内容 |
+|---|---|---|
+| 日次調整 | `/admin/daily` | 1日分を施設×枠で配置。勤務間隔・重複・欠員をチェック |
+| 月間 | `/admin/monthly` | 1か月をスタッフ×日の表で入力（朝・夕・朝夕通し・夜・浮き・休み・有給）。施設ごとに公開 |
+| 希望 | `/admin/requests` | スタッフの希望一覧と代理入力 |
+| 人件費 | `/admin/cost` | 下書きを含むシフト × 時給・交通費の見込み |
+| スタッフ | `/admin/staff` | 追加（ID＋PIN発行）・氏名/所属/時給/交通費の編集・PIN再発行・提出期限の延長・停止 |
+| 確定シフト | `/staff/schedule` | 公開済みの自分のシフト |
+| 希望入力 | `/staff/requests` | 来月から3か月分の希望を提出 |
+| PIN変更 | `/staff/pin` | 初回ログイン時は必ずここへ誘導 |
 
-```bash
-# 既存リポジトリをクローン or 新規作成
-npx create-next-app@latest hotel-shift \
-  --typescript \
-  --tailwind \
-  --eslint \
-  --app \
-  --src-dir \
-  --import-alias "@/*"
-
-cd hotel-shift
-```
-
-### 2. 依存パッケージのインストール
-
-```bash
-# Supabase クライアント
-npm install @supabase/supabase-js @supabase/ssr
-
-# shadcn/ui 初期化（対話形式）
-npx shadcn@latest init
-# ↑ ここで "New York" スタイル、TypeScript: Yes を選択推奨
-
-# shadcn コンポーネント追加
-npx shadcn@latest add button badge toast sonner
-
-# 日付操作
-npm install date-fns
-
-# アイコン（Next.js プロジェクトに既に含まれていることが多い）
-npm install lucide-react
-```
-
-### 3. Supabase プロジェクト作成
-
-1. [https://supabase.com](https://supabase.com) にアクセスしてプロジェクトを作成
-2. **SQL Editor** を開き、`supabase/migrations/001_initial_schema.sql` の内容を全コピペして実行
-3. プロジェクトの **Settings → API** から以下を取得：
-   - `Project URL`
-   - `anon public key`
-
-### 4. 環境変数の設定
-
-```bash
-# .env.local を作成
-cat > .env.local << 'EOF'
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxxxxxxx...
-EOF
-```
-
-### 5. ローカル起動
-
-```bash
-npm run dev
-# → http://localhost:3000 で起動
-```
+ログイン：スタッフは **ログインID＋6桁PIN**（内部的には `<ID>@staff.hotel-shift.invalid` のメールとして Supabase Auth に登録）、管理者は **メール＋パスワード**。
 
 ---
 
@@ -81,79 +31,87 @@ npm run dev
 
 ```
 src/
-├── app/
-│   ├── admin/
-│   │   ├── daily/       # 管理者：日次調整画面
-│   │   │   └── page.tsx
-│   │   └── monthly/     # 管理者：月次マトリックス
-│   │       └── page.tsx
-│   ├── staff/
-│   │   └── wishes/      # スタッフ：希望入力
-│   │       └── page.tsx
-│   └── api/
-│       ├── shifts/
-│       │   ├── route.ts            # シフトCRUD
-│       │   └── ai-draft/route.ts   # AI自動生成
-│       └── wishes/
-│           └── route.ts
-├── components/
-│   ├── admin/
-│   │   ├── SlotDropZone.tsx   # D&Dスロット
-│   │   ├── StaffPool.tsx      # 未配置プール
-│   │   └── MonthlyMatrix.tsx  # 月次俯瞰表
-│   └── staff/
-│       └── WishInputGrid.tsx  # 希望入力グリッド
-├── lib/
-│   ├── supabase.ts    # Supabaseクライアント
-│   └── validation.ts  # NGパターン検証
-└── types/
-    └── index.ts       # 共通型定義
+  middleware.ts          全ページ共通の入口：ログイン確認・停止アカウントの締め出し・
+                         管理者ページの保護・初期PINのままならPIN変更へ誘導
+  app/
+    actions/             サーバー側の処理（Server Actions）。DBの読み書きはすべてここ
+      board.ts           日次・月間・希望の表データ、シフトの追加/削除/置き換え、公開
+      staff.ts           スタッフ一覧・追加・編集・PIN再発行・期限延長・停止
+      cost.ts            人件費の集計
+      requests.ts        スタッフ本人の希望の読み込み・提出
+      auth.ts            ログイン・ログアウト・PIN/パスワード変更
+    admin/<画面>/        page.tsx（データ取得）＋ *Client.tsx（操作画面）
+    staff/<画面>/        スタッフ用画面
+    admin/loading.tsx    ページ切り替え中の表示（staff/loading.tsx も同様）
+  components/            画面部品（ヘッダー・タブ・希望カレンダーなど）
+  lib/
+    session.ts           ログイン中ユーザーと自分のプロフィール（1回の表示の中で使い回す）
+    auth-guard.ts        requireAdmin()：管理者専用の処理は必ず最初にこれを通す
+    supabase-server.ts   本人の権限で動く Supabase クライアント（RLS が効く）
+    supabase-admin.ts    service role（RLS を無視）。requireAdmin() の後でだけ使う
+    shift-kinds.ts       シフトの種類（朝/夕/通し/夜/浮き/休み/有給）と表示・勤務時間の計算
+    rules.ts             勤務間隔・重複・欠員のチェック
+    requests.ts          希望の正規化・表示・入力ルール（時間指定は1日2つまで等）
+    pay.ts               地域別の初期時給・有給の所定時間
+    utils.ts             日付（日本時間）・施設の並び順・スタッフの並び替え
+  types/index.ts         DBの行の型と共通の型
+supabase/migrations/     DBの変更履歴（下記）
+design_handoff_hotel_shift/  初期の設計資料・プロトタイプ（参照用。アプリからは使っていない）
+```
+
+### 権限の考え方
+
+- 画面の表示：`middleware.ts` がログインと管理者ページを守る。
+- データの読み書き：Server Action は middleware を通らないので、管理者用の処理は先頭で `requireAdmin()` を必ず呼ぶ。
+  `createAdminClient()`（RLS 無視）はそのチェックの後でだけ使う。
+- シフトや希望の書き込みは本人のセッション（`createClient()`）で行い、DB側の RLS でも管理者だけに制限している。
+
+---
+
+## DB（Supabase）
+
+`supabase/migrations/` を番号順に Supabase の SQL Editor で実行する。本番には 009 まで適用済み。
+
+| ファイル | 内容 |
+|---|---|
+| 001, 002 | 初期版（v1）。003 で作り直したので新規環境では不要 |
+| 003_v2_schema | 現行スキーマ：施設・枠・所属・時給・シフト・公開版・希望・変更履歴・RLS |
+| 004_add_is_staff | 管理者がシフトに入るための `is_staff` |
+| 005_launch | ログインID＋PIN、初期PIN変更フラグ |
+| 006_multi_requests | 1日に複数の希望 |
+| 007_two_time_ranges | 時間指定の希望を1日2つまで |
+| 008_paid_leave | 有給（シフト・希望） |
+| 009_wage_nullable | 時給の未設定（null＝施設の初期時給）と 0円 の区別 |
+
+DBを変える変更を入れるときは、新しい番号のファイルを追加し、本番で実行してからアプリをデプロイする。
+
+---
+
+## ローカルで動かす
+
+```bash
+npm install
+# .env.local を作成（値は Vercel の Environment Variables と同じ）
+#   NEXT_PUBLIC_SUPABASE_URL=...
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+#   SUPABASE_SERVICE_ROLE_KEY=...      ← 公開しないこと
+npm run dev        # http://localhost:3000
+```
+
+変更したら出す前に：
+
+```bash
+npx tsc --noEmit   # 型チェック
+npm run lint
+npm test           # ルール・希望・時給のテスト
+npm run build
 ```
 
 ---
 
-## 開発フェーズ計画
+## 困ったとき
 
-### Phase 1（MVP） ✅ 現在地
-- [x] DB設計（SQL）
-- [x] 型定義
-- [x] 管理者：日次調整画面（D&D）
-- [x] 管理者：月次マトリックス（警告表示）
-- [x] スタッフ：希望入力グリッド
-
-### Phase 2（認証・永続化）
-- [ ] Supabase Auth ログイン（メール/パスワード）
-- [ ] ミドルウェアでのロール別ルーティング
-- [ ] Supabase からのデータ取得・保存
-
-### Phase 3（AI自動生成）
-- [ ] Gemini API 連携
-- [ ] プロンプトチューニング
-- [ ] AI下書きレビューUI
-
----
-
-## NGパターンの検証ロジック
-
-`src/lib/validation.ts` の `validateDayAssignment()` が中心。
-
-```
-夜勤（22:00-08:00）→ 翌朝勤（08:00-16:00）は絶対禁止
-```
-
-DBレベルでも `v_monthly_shift_summary` ビューで `has_ng_pattern` フラグを持ちます。
-
----
-
-## AI自動生成の設計思想
-
-`shifts` テーブルの以下フィールドでAI生成分を管理：
-
-| フィールド    | 説明                          |
-|-------------|-------------------------------|
-| `ai_suggested` | AIが提案したシフトか否か    |
-| `ai_model`     | 使用モデル名（例: gemini-1.5-pro） |
-| `ai_run_id`    | バッチ実行の追跡ID          |
-| `is_confirmed` | 管理者が承認したか否か      |
-
-AI生成の下書きは `is_confirmed = false` で保存され、管理者が確認・調整後に `true` にします。
+- **画面に赤いエラー**：多くは DB の列や関数が足りない（マイグレーション未適用）。メッセージに `column ... does not exist` などがあれば該当の SQL を実行する。
+- **本番だけおかしい**：Vercel のダッシュボード → `dot-hotel-shift` → Logs でサーバーのエラーを確認。
+- **ログインできない**：Supabase → Authentication → Users でユーザーがいるか、`profiles.is_active` が true か。スタッフのPINは管理画面の「PIN再発行」で作り直せる。
+- **前の状態に戻したい**：Vercel → Deployments で前のデプロイを「Promote to Production」（DBは戻らないので注意）。

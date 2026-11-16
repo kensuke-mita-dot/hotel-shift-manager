@@ -6,7 +6,6 @@ import { Navbar } from '@/components/layout/Navbar'
 export const metadata: Metadata = {
   title: 'HOTEL SHIFT',
   description: 'ホテル向けシフト管理システム',
-  manifest: '/manifest.json',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'HOTEL SHIFT' },
 }
 

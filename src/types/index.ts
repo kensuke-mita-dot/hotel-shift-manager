@@ -42,7 +42,12 @@ export interface Profile {
   is_active:        boolean
   hire_date:        string | null
   cum_days_initial: number
-  department?:      string | null
+  /** スタッフのログインID（管理者は null） */
+  login_id:         string | null
+  /** 初期PIN・再発行PINのまま（ログイン後にPIN変更を求める） */
+  must_change_pin:  boolean
+  /** 管理者がシフトに入る場合 true */
+  is_staff:         boolean
   created_at:       string
   updated_at:       string
 }
@@ -108,40 +113,6 @@ export interface PublishedShift {
   ends_at:      string
   published_at: string
   published_by: string | null
-}
-
-// ─── AI下書き（Phase 2 用に残す） ─────────────────────────
-export interface AiDraftRun {
-  id:             string
-  triggered_by:   string
-  target_month:   string
-  model_name:     string
-  prompt_tokens?: number | null
-  status:         'pending' | 'running' | 'done' | 'error'
-  error_message?: string | null
-  created_at:     string
-  finished_at?:   string | null
-}
-
-// ─── UI 用の集約型 ────────────────────────────────────────
-
-/** 希望入力画面のカレンダーマス */
-export interface RequestCellData {
-  date:       string
-  type:       RequestType | null   // null = 空欄
-  start_time: string | null
-  end_time:   string | null
-}
-
-/** 日次調整画面のスタッフ行 */
-export interface StaffForDay {
-  staffId:     string
-  fullName:    string
-  request:     Pick<ShiftRequest, 'type' | 'start_time' | 'end_time'> | null
-  /** この施設・この日の配置状態 */
-  assignedHere: { kind: string; start_time: string; end_time: string } | null
-  /** 他施設に配置済みの場合 */
-  assignedElsewhere: { facility_id: string; kind: string } | null
 }
 
 /** チェック違反 */

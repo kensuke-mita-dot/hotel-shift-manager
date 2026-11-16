@@ -1,13 +1,12 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase-server'
+import { getSessionUser } from '@/lib/session'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { fetchStaffList } from '@/app/actions/staff'
 import { StaffClient } from './StaffClient'
 import type { Facility } from '@/types'
 
 export default async function StaffPage() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const admin = createAdminClient()

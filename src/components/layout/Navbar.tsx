@@ -1,30 +1,23 @@
 // Server Component — ヘッダー。未ログイン時は非表示
-import { createClient } from '@/lib/supabase-server'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase-server'
+import { getSessionUser, getMyProfile } from '@/lib/session'
 import { logoutAction } from '@/app/actions/auth'
 
 export async function Navbar() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) return null
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, role')
-    .eq('id', user.id)
-    .single()
+  // プロフィールと所属施設は同時に取る
+  const [profile, { data: sf }] = await Promise.all([
+    getMyProfile(),
+    createClient().from('staff_facilities').select('facility_id').eq('staff_id', user.id),
+  ])
 
   // スタッフは所属施設名を表示
-  let facilityLabel = '全施設'
-  if (profile?.role === 'staff') {
-    const { data: sf } = await supabase
-      .from('staff_facilities')
-      .select('facility_id')
-      .eq('staff_id', user.id)
-    if (sf && sf.length > 0) {
-      facilityLabel = sf.map(r => r.facility_id).join('・')
-    }
-  }
+  const facilityLabel = profile?.role === 'staff' && sf && sf.length > 0
+    ? sf.map(r => r.facility_id).join('・')
+    : '全施設'
 
   const userLabel = profile?.role === 'admin'
     ? `管理者 · ${facilityLabel}`

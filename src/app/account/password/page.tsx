@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase-server'
+import { getSessionUser, getMyProfile } from '@/lib/session'
 import { CheckCircle2 } from 'lucide-react'
 import { PasswordForm } from './PasswordForm'
 
@@ -9,15 +9,8 @@ export default async function PasswordPage({
 }: {
   searchParams: { changed?: string }
 }) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [user, profile] = await Promise.all([getSessionUser(), getMyProfile()])
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('login_id, role')
-    .eq('id', user.id)
-    .single()
 
   // スタッフ（ログインID＋PIN）はPIN変更画面へ
   if (profile?.login_id) redirect('/staff/pin')

@@ -1,17 +1,10 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase-server'
+import { getMyProfile } from '@/lib/session'
 import { PinForm } from './PinForm'
 
 export default async function PinPage() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('must_change_pin, login_id')
-    .eq('id', user.id)
-    .single()
+  const profile = await getMyProfile()
+  if (!profile) redirect('/login')
 
   const mustChange = profile?.must_change_pin ?? false
 

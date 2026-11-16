@@ -45,17 +45,17 @@ export async function fetchCost(month: string): Promise<CostData> {
     month, facilities: [], rows: [], facilityTotals: {},
     total: { pay: 0, transport: 0, total: 0, minutes: 0, shifts: 0 }, missingWage: [],
   }
-  const guard = await requireAdmin()
-  if ('error' in guard) return { ...empty, error: guard.error }
-
+  // 権限チェックと読み込みを同時に始める（権限がなければ結果は返さない）
   const { from, to } = monthRange(month)
   const db = createAdminClient()
-  const [fRes, shRes, pRes, payRes] = await Promise.all([
+  const [guard, fRes, shRes, pRes, payRes] = await Promise.all([
+    requireAdmin(),
     db.from('facilities').select('id, name, sort').order('sort'),
     db.from('shifts').select('facility_id, staff_id, date, kind, start_time, end_time').gte('date', from).lte('date', to),
     db.from('profiles').select('id, full_name'),
     db.from('staff_pay').select('staff_id, hourly_wage, transport_type, transport_amount'),
   ])
+  if ('error' in guard) return { ...empty, error: guard.error }
   const err = fRes.error ?? shRes.error ?? pRes.error ?? payRes.error
   if (err) return { ...empty, error: err.message }
 

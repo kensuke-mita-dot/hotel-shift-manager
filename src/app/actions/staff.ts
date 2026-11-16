@@ -37,24 +37,21 @@ export interface StaffListItem {
   extendedUntil: string | null
 }
 
-// 後方互換
-export type StaffMember = StaffListItem
-
 const NO_PAY: StaffPayInfo = { hourlyWage: null, transportType: 'per_shift', transportAmount: 0 }
 
 // ─── スタッフ一覧（施設・時給・提出状況付き）─────────────────
 export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?: string }> {
-  const guard = await requireAdmin()
-  if ('error' in guard) return { staff: [], error: guard.error }
-
+  // 権限チェックと読み込みを同時に始める（権限がなければ結果は返さない）
   const admin = createAdminClient()
 
   const [
+    guard,
     { data: profiles, error: pErr },
     { data: sfs },
     { data: subs },
     { data: pays },
   ] = await Promise.all([
+    requireAdmin(),
     admin.from('profiles')
       .select('id, full_name, email, login_id, must_change_pin, role, is_active, is_staff')
       .order('full_name'),
@@ -64,6 +61,7 @@ export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?
       .eq('month', `${nextMonthJST()}-01`),
     admin.from('staff_pay').select('staff_id, hourly_wage, transport_type, transport_amount'),
   ])
+  if ('error' in guard) return { staff: [], error: guard.error }
 
   if (pErr) {
     const hint = /column/.test(pErr.message) ? '（Supabase に 005_launch.sql が未適用の可能性があります）' : ''
@@ -122,11 +120,6 @@ export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?
     || compareStaffInFacility({ ...a, isAdmin: a.role === 'admin' }, { ...b, isAdmin: b.role === 'admin' }))
 
   return { staff }
-}
-
-// 後方互換
-export async function fetchStaff() {
-  return fetchStaffList()
 }
 
 // ─── スタッフ追加（ログインID＋初期PINを発行。メール不要）────────
