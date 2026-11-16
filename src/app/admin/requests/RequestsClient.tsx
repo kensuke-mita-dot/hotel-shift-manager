@@ -27,6 +27,7 @@ const TYPE_STYLE: Record<RequestType, string> = {
   night:   'bg-[#ecebfa] text-[#4a3fb0]',
   custom:  'bg-hs-gray-light text-hs-text',
   off:     'bg-[#fdecec] text-hs-danger',
+  paid_leave: 'bg-[#e3f4f1] text-[#1f7a6d]',
 }
 
 /** 複数選択できる希望（休は単独） */
@@ -71,7 +72,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
   useEffect(() => {
     if (!selKey) return
     const cur = reqs.get(selKey) ?? []
-    setDraft(new Set(cur.filter(r => r.type !== 'custom' && r.type !== 'off').map(r => r.type)))
+    setDraft(new Set(cur.filter(r => MULTI.includes(r.type)).map(r => r.type)))
     setTimes(cur.filter(r => r.type === 'custom' && r.start_time && r.end_time)
       .map(r => ({ start: r.start_time!.slice(0, 5), end: r.end_time!.slice(0, 5) })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,10 +289,15 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                 決定して次の日へ
               </button>
               <span className="inline-flex items-center gap-2 pl-2 border-l border-hs-border ml-auto">
-                <button onClick={() => save(selected, [item(selected, 'off')])}
+                <button onClick={() => save(selected, [item(selected, 'off')])} title="入れない"
                   className={cn('h-10 min-w-[56px] px-3 rounded-btn text-sm font-medium', TYPE_STYLE.off,
                     selReqs.some(r => r.type === 'off') && 'ring-2 ring-hs-blue')}>
-                  休
+                  ×
+                </button>
+                <button onClick={() => save(selected, [item(selected, 'paid_leave')])}
+                  className={cn('h-10 min-w-[56px] px-3 rounded-btn text-sm font-medium', TYPE_STYLE.paid_leave,
+                    selReqs.some(r => r.type === 'paid_leave') && 'ring-2 ring-hs-blue')}>
+                  有給
                 </button>
                 <button onClick={() => save(selected, [])}
                   className="h-10 px-3 rounded-btn text-sm text-hs-text-sub border border-hs-border bg-white">
@@ -299,7 +305,7 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
                 </button>
               </span>
             </div>
-            <p className="text-[11px] text-hs-text-lighter mt-2">朝・夕・朝夕・夜は複数選べます（例：朝と夜のどちらでも可）。時間指定は2つまで（例：8:00〜13:00と14:30〜22:00）。「休」「消す」は押すとすぐ保存して次の日へ進みます。</p>
+            <p className="text-[11px] text-hs-text-lighter mt-2">朝・夕・朝夕・夜は複数選べます（例：朝と夜のどちらでも可）。時間指定は2つまで（例：8:00〜13:00と14:30〜22:00）。「×（入れない）」「有給」「消す」は押すとすぐ保存して次の日へ進みます。</p>
           </div>
         </div>
       )}

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth-guard'
 import { addDays, monthRange, facilityRank, mainFacility, compareStaffInFacility } from '@/lib/utils'
-import { KIND_BOTH, KIND_CUSTOM, bothTimes } from '@/lib/shift-kinds'
+import { KIND_BOTH, KIND_CUSTOM, LEAVE_KINDS, bothTimes } from '@/lib/shift-kinds'
 import type { Facility, FacilitySlot, RequestType } from '@/types'
 import { validateDayRequests } from '@/lib/requests'
 
@@ -149,6 +149,9 @@ export async function addShift(input: {
     }
     if (input.start === input.end) return { error: '開始と終了が同じ時刻です' }
     start = input.start; end = input.end
+  } else if (LEAVE_KINDS.includes(input.kind)) {
+    // 休み・有給は勤務ではないので時刻なし（00:00-00:00 で保存）
+    start = '00:00'; end = '00:00'
   } else if (input.kind === KIND_BOTH) {
     const t = bothTimes(fs)
     if (!t) return { error: 'この施設には朝夕通しの枠がありません' }

@@ -29,7 +29,7 @@ export interface SlotDef {
 export interface RequestEntry {
   staff_id: string
   date: string
-  type: 'morning' | 'evening' | 'both' | 'night' | 'off' | 'custom'
+  type: 'morning' | 'evening' | 'both' | 'night' | 'off' | 'paid_leave' | 'custom'
 }
 
 export type ViolationType = 'interval' | 'overlap' | 'understaffed' | 'partial_both'
@@ -219,6 +219,9 @@ export function runAllChecks(params: {
   requests: RequestEntry[]
   facilityDates: { facilityId: string; date: string }[]
 }): Violation[] {
+  // 休み・有給は勤務ではないのでチェックしない
+  params = { ...params, shifts: params.shifts.filter(x => x.kind !== 'off' && x.kind !== 'paid_leave') }
+
   const { shifts, slots, requests, facilityDates } = params
   return [
     ...checkInterval(shifts),

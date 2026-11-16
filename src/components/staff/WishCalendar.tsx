@@ -122,7 +122,8 @@ export function WishCalendar({
     ...(hasSlot('morning') && hasSlot('evening') ? [{ type: 'both' as RequestType, label: '朝夕', timeLabel: '' }] : []),
     ...(hasSlot('night') ? [{ type: 'night' as RequestType, label: '夜', timeLabel: slotTimeLabel(primaryFacilitySlots, 'night') }] : []),
     { type: 'custom', label: '時間指定', timeLabel: '' },
-    { type: 'off', label: '休', timeLabel: '' },
+    { type: 'off', label: '×', timeLabel: '' },
+    { type: 'paid_leave', label: '有給', timeLabel: '' },
   ]
 
   // Status tag
@@ -133,7 +134,7 @@ export function WishCalendar({
   })()
 
   // Counts
-  const counts: Record<RequestType, number> = { morning: 0, evening: 0, both: 0, night: 0, custom: 0, off: 0 }
+  const counts: Record<RequestType, number> = { morning: 0, evening: 0, both: 0, night: 0, custom: 0, off: 0, paid_leave: 0 }
   Array.from(local.values()).forEach(list => list.forEach(e => { counts[e.type]++ }))
   const emptyCount = DAYS_IN_MONTH - local.size
   const emptyDays = Array.from({ length: DAYS_IN_MONTH }, (_, i) => i + 1).filter(d => !local.has(dateStr(d)))
@@ -249,7 +250,7 @@ export function WishCalendar({
             }
             const ds = dateStr(d)
             const list = local.get(ds) ?? []
-            const isOff = list.some(e => e.type === 'off')
+            const isOff = list.some(e => e.type === 'off' || e.type === 'paid_leave')
             const customs = list.filter(e => e.type === 'custom' && e.start_time && e.end_time)
             const dow = dowOfDay(d)
             const bg = isOff ? 'bg-[#fdf0e6]' : list.length ? 'bg-[#eaf4fd]' : 'bg-white'
@@ -378,7 +379,7 @@ function WishPicker({ current, slotOptions, onDone, onClear }: {
   onClear: () => void
 }) {
   const [picked, setPicked] = useState<Set<RequestType>>(
-    () => new Set(current.filter(e => e.type !== 'custom' && e.type !== 'off').map(e => e.type)),
+    () => new Set(current.filter(e => !['custom', 'off', 'paid_leave'].includes(e.type)).map(e => e.type)),
   )
   // 時間指定は2つまで（例：08:00-13:00 と 14:30-22:00）
   const [customs, setCustoms] = useState<{ start: string; end: string }[]>(
@@ -412,7 +413,7 @@ function WishPicker({ current, slotOptions, onDone, onClear }: {
     return next
   })
 
-  const multi = slotOptions.filter(o => o.type !== 'custom' && o.type !== 'off')
+  const multi = slotOptions.filter(o => !['custom', 'off', 'paid_leave'].includes(o.type))
   const hasAny = picked.size > 0 || customs.length > 0
 
   const done = () => onDone([
@@ -474,7 +475,14 @@ function WishPicker({ current, slotOptions, onDone, onClear }: {
           className={`flex-1 h-11 rounded-btn text-sm font-medium border-2 transition-colors
             ${current.some(e => e.type === 'off') ? 'border-orange-400 bg-[#fdf0e6] text-orange-600' : 'border-hs-border text-orange-600'}`}
         >
-          休み
+          ×（入れない）
+        </button>
+        <button
+          onClick={() => onDone([{ type: 'paid_leave' }])}
+          className={`flex-1 h-11 rounded-btn text-sm font-medium border-2 transition-colors
+            ${current.some(e => e.type === 'paid_leave') ? 'border-[#2f9e8f] bg-[#e3f4f1] text-[#1f7a6d]' : 'border-hs-border text-[#1f7a6d]'}`}
+        >
+          有給
         </button>
         {current.length > 0 && (
           <button
