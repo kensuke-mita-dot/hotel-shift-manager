@@ -228,10 +228,19 @@ export async function resetPin(userId: string): Promise<{ pin?: string; error?: 
 // ─── 所属施設・時給・交通費の更新 ──────────────────────────────
 export async function updateStaffSettings(
   staffId: string,
-  settings: { facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo },
+  settings: { fullName?: string; facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo },
 ): Promise<{ error?: string }> {
   const guard = await requireAdmin()
   if ('error' in guard) return { error: guard.error }
+
+  // 氏名の変更（指定されたときだけ）
+  if (settings.fullName !== undefined) {
+    const name = settings.fullName.trim()
+    if (!name) return { error: '氏名を入力してください' }
+    if (name.length > 50) return { error: '氏名が長すぎます' }
+    const { error: nameErr } = await createAdminClient().from('profiles').update({ full_name: name }).eq('id', staffId)
+    if (nameErr) return { error: nameErr.message }
+  }
 
   const { facilityIds, primaryFacilityId, pay } = settings
   if (facilityIds.length > 0 && (!primaryFacilityId || !facilityIds.includes(primaryFacilityId))) {
