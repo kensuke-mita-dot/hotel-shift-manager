@@ -483,7 +483,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                       title="所属施設・時給・交通費を編集"
                     >
                       <span>
-                        {member.pay.hourlyWage === 0
+                        {member.pay.hourlyWage === null
                           ? `初期値 ${yen(defaultWage(member.facilities.find(f => f.isPrimary)?.facilityId ?? member.facilities[0]?.facilityId))}/h`
                           : `${yen(member.pay.hourlyWage)}/h`}
                       </span>
@@ -651,9 +651,10 @@ function SettingsEditor({
 }) {
   const [facIds, setFacIds]   = useState<string[]>(member.facilities.map(f => f.facilityId))
   const [primary, setPrimary] = useState<string>(member.facilities.find(f => f.isPrimary)?.facilityId ?? '')
-  const [wage, setWage]       = useState(member.pay.hourlyWage ? String(member.pay.hourlyWage) : '')
+  // 空欄＝未設定（施設の初期時給）、0＝0円
+  const [wage, setWage]       = useState(member.pay.hourlyWage === null ? '' : String(member.pay.hourlyWage))
   const [tType, setTType]     = useState<StaffPayInfo['transportType']>(member.pay.transportType)
-  const [tAmount, setTAmount] = useState(member.pay.transportAmount ? String(member.pay.transportAmount) : '')
+  const [tAmount, setTAmount] = useState(String(member.pay.transportAmount ?? 0))
   const [saving, setSaving]   = useState(false)
 
   const input = 'border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -664,7 +665,7 @@ function SettingsEditor({
     await onSave({
       facilityIds: facIds,
       primaryFacilityId: facIds.length ? (primary || null) : null,
-      pay: { hourlyWage: Number(wage || 0), transportType: tType, transportAmount: Number(tAmount || 0) },
+      pay: { hourlyWage: wage.trim() === '' ? null : Number(wage), transportType: tType, transportAmount: Number(tAmount || 0) },
     })
     setSaving(false)
   }
@@ -711,7 +712,7 @@ function SettingsEditor({
           <label className="text-xs text-gray-500 mb-1 block">時給（円）</label>
           <input type="number" min={0} step={1} inputMode="numeric" value={wage}
             onChange={e => setWage(e.target.value)} placeholder={String(defaultWage(primary || facIds[0]) || 1200)} className={`${input} w-28`} />
-          <p className="text-[11px] text-gray-400 mt-1 max-w-[220px]">空欄なら、勤務した施設の地域の初期時給（東京1,280円・京都1,180円・名古屋1,195円）で計算します</p>
+          <p className="text-[11px] text-gray-400 mt-1 max-w-[220px]">空欄なら、勤務した施設の地域の初期時給（東京1,280円・京都1,180円・名古屋1,195円）で計算。時給が発生しない人は 0 を入力</p>
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">交通費</label>

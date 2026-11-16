@@ -128,7 +128,7 @@ export default async function CostPage({
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {r.usesDefaultWage
                           ? <span className="text-hs-text-sub">施設の初期値</span>
-                          : yen(r.hourlyWage)}
+                          : yen(r.hourlyWage ?? 0)}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{yen(r.pay)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">

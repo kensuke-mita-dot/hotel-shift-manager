@@ -15,7 +15,8 @@ export interface FacilityBadge {
 }
 
 export interface StaffPayInfo {
-  hourlyWage: number
+  /** null＝未設定（施設の初期時給で計算）、0＝0円 */
+  hourlyWage: number | null
   transportType: 'per_shift' | 'monthly'
   transportAmount: number
 }
@@ -39,7 +40,7 @@ export interface StaffListItem {
 // 後方互換
 export type StaffMember = StaffListItem
 
-const NO_PAY: StaffPayInfo = { hourlyWage: 0, transportType: 'per_shift', transportAmount: 0 }
+const NO_PAY: StaffPayInfo = { hourlyWage: null, transportType: 'per_shift', transportAmount: 0 }
 
 // ─── スタッフ一覧（施設・時給・提出状況付き）─────────────────
 export async function fetchStaffList(): Promise<{ staff: StaffListItem[]; error?: string }> {
@@ -236,9 +237,10 @@ export async function updateStaffSettings(
   if (facilityIds.length > 0 && (!primaryFacilityId || !facilityIds.includes(primaryFacilityId))) {
     return { error: '主な所属を選択してください' }
   }
-  const wage      = Math.round(Number(pay.hourlyWage))
+  // 空欄（null）は未設定＝施設の初期時給。0 は 0円
+  const wage      = pay.hourlyWage === null ? null : Math.round(Number(pay.hourlyWage))
   const transport = Math.round(Number(pay.transportAmount))
-  if (!Number.isFinite(wage) || wage < 0)           return { error: '時給は0以上の数値で入力してください' }
+  if (wage !== null && (!Number.isFinite(wage) || wage < 0)) return { error: '時給は0以上の数値で入力してください' }
   if (!Number.isFinite(transport) || transport < 0) return { error: '交通費は0以上の数値で入力してください' }
   if (pay.transportType !== 'per_shift' && pay.transportType !== 'monthly') return { error: '交通費の区分が不正です' }
 
@@ -267,7 +269,12 @@ export async function updateStaffSettings(
     transport_amount: transport,
     updated_at: new Date().toISOString(),
   })
-  if (payErr) return { error: payErr.message }
+  if (payErr) {
+    if (/null value/i.test(payErr.message)) {
+      return { error: '時給を空欄（初期値）にするには、Supabase で 009_wage_nullable.sql の実行が必要です' }
+    }
+    return { error: payErr.message }
+  }
 
   revalidatePath('/admin/staff')
   revalidatePath('/admin/cost')
