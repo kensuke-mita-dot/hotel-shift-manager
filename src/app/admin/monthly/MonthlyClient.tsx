@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Send, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { publishMonth, setCellShift, type MonthBoard, type BoardShift } from '@/app/actions/board'
-import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, hhmm, boardRows, bothTimes } from '@/lib/shift-kinds'
+import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, KIND_OFF, KIND_PAID, hhmm, boardRows, bothTimes, isWorkKind, kindLabel } from '@/lib/shift-kinds'
 import { requestText } from '@/lib/requests'
 import { coversSlot, runAllChecks } from '@/lib/rules'
 import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays } from '@/lib/utils'
@@ -99,6 +99,8 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
     if (kind === KIND_CUSTOM) {
       if (floatStart === floatEnd) { toast.error('浮きの開始と終了が同じです'); return }
       startT = floatStart; endT = floatEnd
+    } else if (kind === KIND_OFF || kind === KIND_PAID) {
+      startT = '00:00'; endT = '00:00'
     } else if (kind === 'both') {
       const t = bothTimes(facilitySlots); if (!t) return
       startT = hhmm(t.start); endT = hhmm(t.end)
@@ -212,7 +214,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
           </thead>
           <tbody>
             {rows.map((s, i) => {
-              const count = new Set(shifts.filter(x => x.staff_id === s.id).map(x => x.date)).size
+              const count = new Set(shifts.filter(x => x.staff_id === s.id && isWorkKind(x.kind)).map(x => x.date)).size
               const group = mainFacility(s)
               const newGroup = i === 0 || mainFacility(rows[i - 1]) !== group
               return (
@@ -235,7 +237,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                     const warn = list.map(x => flagged.get(x.id)).filter(Boolean).join('\n')
                     const isSel = selected?.staffId === s.id && selected.date === d
                     const chips = list.map(x => (
-                      <span key={x.id} title={`${x.facility_id} ${hhmm(x.start_time)}-${hhmm(x.end_time)}`}
+                      <span key={x.id} title={isWorkKind(x.kind) ? `${x.facility_id} ${hhmm(x.start_time)}-${hhmm(x.end_time)}` : `${x.facility_id} ${kindLabel(x.kind, [])}`}
                         className="block leading-[14px] py-px rounded text-[11px] font-medium text-white"
                         style={{ background: KIND_COLOR[x.kind] ?? '#888' }}>
                         {isAll ? `${x.facility_id.slice(0, 4)}` : ''}{KIND_SHORT[x.kind] ?? x.kind}
@@ -301,10 +303,10 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
       </div>
 
       <p className="text-xs text-hs-text-sub">
-        記号：{['morning', 'evening', 'both', 'night', 'base', 'custom'].map(k => (
+        記号：{['morning', 'evening', 'both', 'night', 'base', 'custom', 'off', 'paid_leave'].map(k => (
           <span key={k} className="inline-flex items-center gap-1 mr-3">
             <span className="inline-block w-3 h-3 rounded-sm" style={{ background: KIND_COLOR[k] }} />
-            {KIND_SHORT[k]}={{ morning: '朝勤', evening: '夕勤', both: '朝夕通し', night: '夜勤', base: '基本', custom: '浮き' }[k]}
+            {KIND_SHORT[k]}={{ morning: '朝勤', evening: '夕勤', both: '朝夕通し', night: '夜勤', base: '基本', custom: '浮き', off: '休み', paid_leave: '有給' }[k]}
           </span>
         ))}
         {editable
@@ -321,7 +323,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                 {nameBy.get(selected.staffId)}　{Number(selected.date.slice(5, 7))}/{Number(selected.date.slice(8))}（{WEEK_JA[weekday(selected.date)]}）{facility}
               </span>
               <span className="text-xs text-hs-text-sub">
-                今：{selShift ? `${KIND_SHORT[selShift.kind] ?? selShift.kind} ${hhmm(selShift.start_time)}-${hhmm(selShift.end_time)}` : 'なし'}
+                今：{selShift ? (isWorkKind(selShift.kind) ? `${KIND_SHORT[selShift.kind] ?? selShift.kind} ${hhmm(selShift.start_time)}-${hhmm(selShift.end_time)}` : kindLabel(selShift.kind, [])) : 'なし'}
                 {selReq.length > 0 && <>　希望：{requestText(selReq)}</>}
                 {selElsewhere.length > 0 && <span className="text-hs-warn">　{selElsewhere.map(x => `${x.facility_id}${KIND_SHORT[x.kind] ?? ''}`).join('・')}に配置済</span>}
               </span>
@@ -353,10 +355,19 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                   浮き
                 </button>
               </span>
-              <button onClick={() => saveCell(selected, null)} disabled={!selShift}
-                className="h-10 px-3 rounded-btn text-sm text-hs-text-sub border border-hs-border bg-white ml-auto disabled:opacity-40">
-                外す
-              </button>
+              <span className="inline-flex items-center gap-2 pl-2 border-l border-hs-border ml-auto">
+                {[KIND_OFF, KIND_PAID].map(k => (
+                  <button key={k} onClick={() => saveCell(selected, k)}
+                    className={cn('h-10 min-w-[56px] px-3 rounded-btn text-sm font-medium text-white', selShift?.kind === k && 'ring-2 ring-offset-1 ring-hs-blue')}
+                    style={{ background: KIND_COLOR[k] }}>
+                    {kindLabel(k, [])}
+                  </button>
+                ))}
+                <button onClick={() => saveCell(selected, null)} disabled={!selShift}
+                  className="h-10 px-3 rounded-btn text-sm text-hs-text-sub border border-hs-border bg-white disabled:opacity-40">
+                  外す
+                </button>
+              </span>
             </div>
             <p className="text-[11px] text-hs-text-lighter mt-2">押すとすぐ保存して次の日へ進みます（下書き。スタッフに見えるのは「公開」後）。</p>
           </div>

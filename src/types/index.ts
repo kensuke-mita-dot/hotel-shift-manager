@@ -3,7 +3,7 @@
 // ============================================================
 
 // ─── Enum 型 ──────────────────────────────────────────────
-export type RequestType = 'morning' | 'evening' | 'both' | 'night' | 'off' | 'custom'
+export type RequestType = 'morning' | 'evening' | 'both' | 'night' | 'off' | 'paid_leave' | 'custom'
 export type ShiftSource = 'staff_request' | 'admin' | 'ai_draft'
 export type ShiftStatus = 'draft' | 'confirmed'
 export type UserRole    = 'staff' | 'admin'
@@ -166,5 +166,6 @@ export const REQUEST_LABEL: Record<RequestType, string> = {
   both:    '朝夕',
   night:   '夜',
   custom:  '時間',
-  off:     '休',
+  off:     '×',
+  paid_leave: '有給',
 }

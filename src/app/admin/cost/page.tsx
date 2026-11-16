@@ -116,7 +116,10 @@ export default async function CostPage({
                       <td className="px-3 py-2.5 text-xs text-hs-text-sub">
                         {Object.entries(r.byFacility).map(([fid, b]) => `${fid} ${b.shifts}回`).join(' / ')}
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{r.days}日</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {r.days}日
+                        {r.paidLeaveDays > 0 && <span className="block text-[11px] text-hs-text-lighter">有給 {r.paidLeaveDays}日</span>}
+                      </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {hours(r.minutes)}
                         {r.lateMinutes > 0 && <span className="block text-[11px] text-hs-text-lighter">うち深夜 {hours(r.lateMinutes)}</span>}
@@ -145,7 +148,7 @@ export default async function CostPage({
           <p className="text-xs text-hs-text-lighter leading-relaxed">
             計算の前提：実働＝勤務時間から休憩（6時間超は45分、8時間超は60分）を引いたもの。
             22時〜翌5時の勤務に深夜割増25%を加算（休憩は深夜帯以外で取る前提）。
-            交通費は「1出勤あたり」なら出勤日数分、「月額」は1日以上出勤した月に計上。残業・休日割増・社会保険料は含みません。
+            交通費は「1出勤あたり」なら出勤日数分、「月額」は1日以上出勤した月に計上。残業・休日割増・社会保険料、有給休暇の賃金は含みません（有給は日数のみ表示）。
           </p>
         </>
       )}

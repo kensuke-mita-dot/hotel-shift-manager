@@ -7,6 +7,13 @@ import type { FacilitySlot } from '@/types'
 
 export const KIND_BOTH   = 'both'
 export const KIND_CUSTOM = 'custom'
+/** 休み・有給（勤務ではない。時刻は 00:00-00:00 で保存） */
+export const KIND_OFF    = 'off'
+export const KIND_PAID   = 'paid_leave'
+export const LEAVE_KINDS = [KIND_OFF, KIND_PAID]
+
+/** 勤務として数えるシフトか（休み・有給は数えない） */
+export const isWorkKind = (kind: string) => !LEAVE_KINDS.includes(kind)
 
 export const KIND_COLOR: Record<string, string> = {
   morning: '#e0a23a',
@@ -15,11 +22,14 @@ export const KIND_COLOR: Record<string, string> = {
   base:    '#2f9e6b',
   both:    '#d0702a',
   custom:  '#80858c',
+  off:     '#b4b9c0',
+  paid_leave: '#2f9e8f',
 }
 
 /** 月間表などで使う1文字ラベル */
 export const KIND_SHORT: Record<string, string> = {
   morning: '朝', evening: '夕', night: '夜', base: '基', both: '通', custom: '浮',
+  off: '休', paid_leave: '有',
 }
 
 export const hhmm = (t: string) => t.slice(0, 5)
@@ -64,6 +74,8 @@ export function bothTimes(slots: FacilitySlot[]): { start: string; end: string }
 export function kindLabel(kind: string, slots: FacilitySlot[]): string {
   if (kind === KIND_BOTH) return '朝夕'
   if (kind === KIND_CUSTOM) return '浮き'
+  if (kind === KIND_OFF) return '休み'
+  if (kind === KIND_PAID) return '有給'
   const s = slots.find(x => x.key === kind)
   if (!s) return kind
   return s.key === 'base' ? '基本' : s.label

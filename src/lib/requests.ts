@@ -11,7 +11,10 @@ export interface RequestItem {
   end_time?: string | null
 }
 
-export const REQUEST_ORDER: RequestType[] = ['morning', 'evening', 'both', 'night', 'custom', 'off']
+export const REQUEST_ORDER: RequestType[] = ['morning', 'evening', 'both', 'night', 'custom', 'off', 'paid_leave']
+
+/** ほかの希望と同時に選べない種類（×＝入れない、有給） */
+export const EXCLUSIVE_REQUESTS: RequestType[] = ['off', 'paid_leave']
 
 /** 時間指定の上限（1日あたり） */
 export const MAX_TIME_RANGES = 2
@@ -19,9 +22,10 @@ export const MAX_TIME_RANGES = 2
 const hhmm = (t: string) => t.slice(0, 5)
 const keyOf = (r: RequestItem) => (r.type === 'custom' ? `custom|${hhmm(r.start_time ?? '')}` : r.type)
 
-/** 並び順をそろえ、重複を除き、「休」があれば休だけにする（時間指定は開始時刻順） */
+/** 並び順をそろえ、重複を除き、「×」「有給」があればそれだけにする（時間指定は開始時刻順） */
 export function normalizeRequests<T extends RequestItem>(list: T[]): T[] {
-  if (list.some(r => r.type === 'off')) return list.filter(r => r.type === 'off').slice(0, 1)
+  const ex = list.find(r => EXCLUSIVE_REQUESTS.includes(r.type))
+  if (ex) return [ex]
   const seen = new Set<string>()
   return [...list]
     .sort((a, b) =>
@@ -60,7 +64,7 @@ function range(r: RequestItem): [number, number] {
 /** 1日分の入力チェック。問題があればメッセージを返す */
 export function validateDayRequests(list: RequestItem[]): string | null {
   const types = list.map(r => r.type)
-  if (types.includes('off') && types.length > 1) return '「休」はほかの希望と同時に選べません'
+  if (types.some(t => EXCLUSIVE_REQUESTS.includes(t)) && types.length > 1) return '「×」「有給」はほかの希望と同時に選べません'
 
   const fixed = types.filter(t => t !== 'custom')
   if (new Set(fixed).size !== fixed.length) return '同じ希望が重複しています'

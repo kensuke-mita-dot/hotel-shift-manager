@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, X, AlertTriangle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { addShift, removeShift, type DayBoard, type BoardShift, type BoardStaff } from '@/app/actions/board'
-import { boardRows, kindLabel, hhmm, KIND_COLOR, KIND_CUSTOM, type BoardRow } from '@/lib/shift-kinds'
+import { boardRows, kindLabel, hhmm, KIND_COLOR, KIND_CUSTOM, type BoardRow, isWorkKind } from '@/lib/shift-kinds'
 import { runAllChecks, coversSlot, type Violation } from '@/lib/rules'
 import { addDays, weekday, WEEK_JA, cn, facilitySummary } from '@/lib/utils'
 import { requestText } from '@/lib/requests'
@@ -38,7 +38,9 @@ export function DailyClient({ board, facility }: { board: DayBoard; facility: st
   const go = (to: string) => router.push(`/admin/daily?facility=${facility}&date=${to}`)
 
   // 誰もどこにも入っていない、シフト対象の人
-  const assignedIds = new Set(dayShifts.map(s => s.staff_id))
+  // 休み・有給の人は「入っていない人」の一覧に、その旨を出す
+  const assignedIds = new Set(dayShifts.filter(s => isWorkKind(s.kind)).map(s => s.staff_id))
+  const leaveBy = new Map(dayShifts.filter(s => !isWorkKind(s.kind)).map(s => [s.staff_id, s.kind]))
   const scopeStaff = facility === 'all'
     ? board.staff
     : board.staff.filter(s => s.facilityIds.includes(facility))
@@ -110,7 +112,9 @@ export function DailyClient({ board, facility }: { board: DayBoard; facility: st
                     className="min-w-0 truncate text-right text-xs text-hs-text-sub"
                     title={r?.length ? `希望：${requestText(r)}` : s.facilityIds.join('・') || '施設未設定'}
                   >
-                    {r?.length ? `希望：${requestText(r)}` : facilitySummary(s)}
+                    {leaveBy.has(s.id)
+                      ? <span className="font-medium text-hs-text">{kindLabel(leaveBy.get(s.id)!, [])}</span>
+                      : r?.length ? `希望：${requestText(r)}` : facilitySummary(s)}
                   </span>
                 </li>
               )
@@ -157,7 +161,7 @@ function FacilityCard(props: {
       <header className="px-4 py-3 border-b border-hs-border flex items-baseline gap-2">
         <span className="font-semibold text-hs-text">{facility.id}</span>
         <span className="text-xs text-hs-text-sub truncate">{facility.name}</span>
-        <span className="ml-auto text-xs text-hs-text-sub">{new Set(shifts.map(s => s.staff_id)).size}名</span>
+        <span className="ml-auto text-xs text-hs-text-sub">{new Set(shifts.filter(s => isWorkKind(s.kind)).map(s => s.staff_id)).size}名</span>
       </header>
 
       <div className="divide-y divide-hs-border">

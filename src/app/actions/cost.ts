@@ -17,6 +17,8 @@ export interface CostRow {
   /** 施設ごとの内訳 */
   byFacility: Record<string, { shifts: number; minutes: number; pay: number; transport: number }>
   days: number
+  /** 有給の日数（給与には含めない） */
+  paidLeaveDays: number
   minutes: number
   lateMinutes: number
   pay: number
@@ -46,7 +48,7 @@ export async function fetchCost(month: string): Promise<CostData> {
   const db = createAdminClient()
   const [fRes, shRes, pRes, payRes] = await Promise.all([
     db.from('facilities').select('id, name, sort').order('sort'),
-    db.from('shifts').select('facility_id, staff_id, date, start_time, end_time').gte('date', from).lte('date', to),
+    db.from('shifts').select('facility_id, staff_id, date, kind, start_time, end_time').gte('date', from).lte('date', to),
     db.from('profiles').select('id, full_name'),
     db.from('staff_pay').select('staff_id, hourly_wage, transport_type, transport_amount'),
   ])
@@ -58,7 +60,16 @@ export async function fetchCost(month: string): Promise<CostData> {
   const facilities = (fRes.data ?? []).map(f => ({ id: f.id as string, name: f.name as string }))
 
   const rowMap = new Map<string, CostRow & { _dates: Map<string, string> }>()
+  const paidLeave = new Map<string, Set<string>>()
   for (const s of shRes.data ?? []) {
+    // 休み・有給は給与計算の対象外（有給は日数だけ数える）
+    if (s.kind === 'off') continue
+    if (s.kind === 'paid_leave') {
+      const set = paidLeave.get(s.staff_id) ?? new Set<string>()
+      set.add(s.date)
+      paidLeave.set(s.staff_id, set)
+      continue
+    }
     let r = rowMap.get(s.staff_id)
     if (!r) {
       const p = pays.get(s.staff_id)
@@ -68,7 +79,7 @@ export async function fetchCost(month: string): Promise<CostData> {
         hourlyWage: p?.hourly_wage ?? 0,
         transportType: (p?.transport_type ?? 'per_shift') as CostRow['transportType'],
         transportAmount: p?.transport_amount ?? 0,
-        byFacility: {}, days: 0, minutes: 0, lateMinutes: 0, pay: 0, transport: 0, total: 0,
+        byFacility: {}, days: 0, paidLeaveDays: 0, minutes: 0, lateMinutes: 0, pay: 0, transport: 0, total: 0,
         _dates: new Map(),
       }
       rowMap.set(s.staff_id, r)
@@ -86,6 +97,7 @@ export async function fetchCost(month: string): Promise<CostData> {
   const rows: CostRow[] = []
   rowMap.forEach(r => {
     r.days = r._dates.size
+    r.paidLeaveDays = paidLeave.get(r.staffId)?.size ?? 0
     if (r.transportType === 'per_shift') {
       r._dates.forEach(fid => { r.byFacility[fid].transport += r.transportAmount })
       r.transport = r.transportAmount * r.days
@@ -121,7 +133,7 @@ export async function fetchCost(month: string): Promise<CostData> {
     transport: rows.reduce((a, r) => a + r.transport, 0),
     total: rows.reduce((a, r) => a + r.total, 0),
     minutes: rows.reduce((a, r) => a + r.minutes, 0),
-    shifts: (shRes.data ?? []).length,
+    shifts: (shRes.data ?? []).filter(x => x.kind !== 'off' && x.kind !== 'paid_leave').length,
   }
 
   return {
