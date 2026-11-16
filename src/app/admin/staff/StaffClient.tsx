@@ -123,11 +123,11 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
   // ─── 所属・時給の保存 ─────────────────────────────────────────
   const handleSaveSettings = async (
     member: StaffListItem,
-    settings: { facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo },
+    settings: { fullName?: string; facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo },
   ) => {
     const result = await updateStaffSettings(member.id, settings)
     if (result.error) { toast.error(`保存に失敗: ${result.error}`); return }
-    toast.success(`${member.fullName} の設定を保存しました`)
+    toast.success(`${settings.fullName?.trim() || member.fullName} の設定を保存しました`)
     setEditingId(null)
     refresh()
   }
@@ -438,7 +438,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                           <div className="flex items-center gap-1.5 text-xs text-gray-500">
                             <span className="font-mono">{member.loginId}</span>
                             {member.mustChangePin && (
-                              <span className="px-1 rounded bg-orange-100 text-orange-700 text-[10px]" title="初期PIN・再発行PINのまま">PIN未変更</span>
+                              <span className="px-1 rounded bg-orange-100 text-orange-700 text-[10px] whitespace-nowrap" title="初期PIN・再発行PINのまま">PIN未変更</span>
                             )}
                             <button
                               onClick={() => handleResetPin(member)}
@@ -480,7 +480,7 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                     <button
                       onClick={() => setEditingId(id => id === member.id ? null : member.id)}
                       className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900"
-                      title="所属施設・時給・交通費を編集"
+                      title="氏名・所属施設・時給・交通費を編集"
                     >
                       <span>
                         {member.pay.hourlyWage === null
@@ -647,8 +647,9 @@ function SettingsEditor({
   member: StaffListItem
   facilities: Facility[]
   onCancel: () => void
-  onSave: (s: { facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo }) => Promise<void>
+  onSave: (s: { fullName?: string; facilityIds: string[]; primaryFacilityId: string | null; pay: StaffPayInfo }) => Promise<void>
 }) {
+  const [name, setName]       = useState(member.fullName)
   const [facIds, setFacIds]   = useState<string[]>(member.facilities.map(f => f.facilityId))
   const [primary, setPrimary] = useState<string>(member.facilities.find(f => f.isPrimary)?.facilityId ?? '')
   // 空欄＝未設定（施設の初期時給）、0＝0円
@@ -663,6 +664,7 @@ function SettingsEditor({
     e.preventDefault()
     setSaving(true)
     await onSave({
+      fullName: name,
       facilityIds: facIds,
       primaryFacilityId: facIds.length ? (primary || null) : null,
       pay: { hourlyWage: wage.trim() === '' ? null : Number(wage), transportType: tType, transportAmount: Number(tAmount || 0) },
@@ -672,6 +674,11 @@ function SettingsEditor({
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">氏名</label>
+        <input type="text" value={name} onChange={e => setName(e.target.value)} required maxLength={50}
+          className={`${input} w-56`} />
+      </div>
       <div className="flex flex-wrap gap-6">
         <div>
           <p className="text-xs text-gray-500 mb-2">所属施設（兼任は複数選択）</p>
