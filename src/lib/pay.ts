@@ -15,8 +15,8 @@ export const FACILITY_REGION: Record<string, string> = {
   BHJ: '東京', MAHT: '東京', MAHB: '東京', BHKK: '京都', MAHNM: '名古屋',
 }
 
-/** 有給1日あたりの所定時間（時間）。有給の賃金＝所定時間×時給 */
-export const PAID_LEAVE_HOURS = 8
+/** 有給1日あたりの所定時間（時間）。8時間拘束−休憩1時間＝7時間。有給の賃金＝所定時間×時給 */
+export const PAID_LEAVE_HOURS = 7
 
 export function defaultWage(facilityId: string | null | undefined): number {
   return (facilityId && FACILITY_DEFAULT_WAGE[facilityId]) || 0
