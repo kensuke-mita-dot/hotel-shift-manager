@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth-guard'
 import { addDays, monthRange, facilityRank, mainFacility, compareStaffInFacility } from '@/lib/utils'
-import { KIND_BOTH, KIND_CUSTOM, KIND_PAID, LEAVE_KINDS, bothTimes } from '@/lib/shift-kinds'
+import { KIND_BOTH, KIND_CUSTOM, LEAVE_KINDS, bothTimes } from '@/lib/shift-kinds'
 import type { Facility, FacilitySlot, RequestType } from '@/types'
 import { validateDayRequests } from '@/lib/requests'
 
@@ -188,10 +188,10 @@ export async function addShift(input: {
     return { error: error.message }
   }
 
-  // 有給は「人×日」で1つ。ほかの施設に入っている有給は外す
-  if (input.kind === KIND_PAID) {
+  // 休み・有給は「人×日」で1つ。ほかの施設に入っている休み・有給は外す
+  if (LEAVE_KINDS.includes(input.kind)) {
     const { error: delErr } = await supabase.from('shifts').delete()
-      .eq('staff_id', input.staffId).eq('date', input.date).eq('kind', KIND_PAID)
+      .eq('staff_id', input.staffId).eq('date', input.date).in('kind', LEAVE_KINDS)
       .neq('facility_id', input.facilityId)
     if (delErr) return { error: delErr.message }
   }
