@@ -18,6 +18,7 @@ import {
 } from '@/app/actions/staff'
 import { REQUESTS_ENABLED } from '@/types'
 import { yen, nextMonthJST, todayJST, addDays } from '@/lib/utils'
+import { defaultWage } from '@/lib/pay'
 import type { Facility, UserRole } from '@/types'
 
 const AVATAR_COLORS = [
@@ -481,8 +482,10 @@ export function StaffClient({ initialStaff, currentUserId, facilities }: Props) 
                       className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900"
                       title="所属施設・時給・交通費を編集"
                     >
-                      <span className={member.pay.hourlyWage === 0 ? 'text-orange-600' : ''}>
-                        {member.pay.hourlyWage === 0 ? '時給未設定' : `${yen(member.pay.hourlyWage)}/h`}
+                      <span>
+                        {member.pay.hourlyWage === 0
+                          ? `初期値 ${yen(defaultWage(member.facilities.find(f => f.isPrimary)?.facilityId ?? member.facilities[0]?.facilityId))}/h`
+                          : `${yen(member.pay.hourlyWage)}/h`}
                       </span>
                       <span className="text-gray-300">·</span>
                       <span>
@@ -707,7 +710,8 @@ function SettingsEditor({
         <div>
           <label className="text-xs text-gray-500 mb-1 block">時給（円）</label>
           <input type="number" min={0} step={1} inputMode="numeric" value={wage}
-            onChange={e => setWage(e.target.value)} placeholder="1200" className={`${input} w-28`} />
+            onChange={e => setWage(e.target.value)} placeholder={String(defaultWage(primary || facIds[0]) || 1200)} className={`${input} w-28`} />
+          <p className="text-[11px] text-gray-400 mt-1 max-w-[220px]">空欄なら、勤務した施設の地域の初期時給（東京1,280円・京都1,180円・名古屋1,195円）で計算します</p>
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">交通費</label>
