@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Send, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { publishMonth, setCellShift, type MonthBoard, type BoardShift } from '@/app/actions/board'
@@ -25,7 +24,6 @@ function fmtAt(iso: string) {
 }
 
 export function MonthlyClient({ board, facility }: { board: MonthBoard; facility: string }) {
-  const router = useRouter()
   const [pending, start] = useTransition()
   const { month } = board
   const [y, m] = month.split('-').map(Number)
@@ -126,8 +124,8 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
         facilityId: facility, date: cell.date, staffId: cell.staffId, kind,
         ...(kind === KIND_CUSTOM ? { start: startT, end: endT } : {}),
       })
+      // 画面の更新はサーバー側の revalidatePath で自動的に届く（ここで再読み込みすると二重取得になる）
       if (r.error) { toast.error(r.error); setAllShifts(before); return }
-      router.refresh()
     })
   }
 
@@ -148,7 +146,6 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
       const r = await publishMonth(ids, month)
       if (r.error) { toast.error(`公開に失敗: ${r.error}`); return }
       toast.success(`${label} の${m}月を公開しました（変更があったスタッフ ${r.changedStaff ?? 0}名）`)
-      router.refresh()
     })
   }
 

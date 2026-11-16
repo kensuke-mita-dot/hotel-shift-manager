@@ -2,7 +2,6 @@
 // 認証チェック + ロール別ルーティング + 停止ユーザーのログアウト
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import type { UserRole } from '@/types'
 
 export async function middleware(request: NextRequest) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -42,7 +41,7 @@ export async function middleware(request: NextRequest) {
 
   if (isPublic) {
     if (user) {
-      const dest = await getDestination(supabase, user.id)
+      const { dest } = await getDestination(supabase, user.id)
       if (dest === 'inactive') {
         // 停止済みアカウント：ログアウトしてエラー表示
         await supabase.auth.signOut()
@@ -66,7 +65,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 停止ユーザーのチェック ────────────────────────────────────────
-  const dest = await getDestination(supabase, user.id)
+  const { dest, mustChangePin } = await getDestination(supabase, user.id)
   if (dest === 'inactive') {
     await supabase.auth.signOut()
     return NextResponse.redirect(new URL('/login?error=inactive', request.url))
@@ -79,32 +78,29 @@ export async function middleware(request: NextRequest) {
 
   // ── 初期PIN・再発行PINのままならPIN変更を先に求める ───────────────
   // （管理者がスタッフ画面を確認用に開くのは許可）
-  if (pathname.startsWith('/staff') && pathname !== '/staff/pin' && dest !== '/admin/daily') {
-    const { data } = await supabase
-      .from('profiles')
-      .select('must_change_pin')
-      .eq('id', user.id)
-      .single()
-    if (data?.must_change_pin) {
-      return NextResponse.redirect(new URL('/staff/pin', request.url))
-    }
+  if (pathname.startsWith('/staff') && pathname !== '/staff/pin' && dest !== '/admin/daily' && mustChangePin) {
+    return NextResponse.redirect(new URL('/staff/pin', request.url))
   }
 
   return supabaseResponse
 }
 
+/** 行き先（ロール別のトップ／停止中）と、PIN変更が必要かを1回の問い合わせで調べる */
 async function getDestination(
   supabase: ReturnType<typeof createServerClient>,
   userId: string
-): Promise<'/admin/daily' | '/staff/schedule' | 'inactive'> {
+): Promise<{ dest: '/admin/daily' | '/staff/schedule' | 'inactive'; mustChangePin: boolean }> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active')
+    .select('role, is_active, must_change_pin')
     .eq('id', userId)
     .single()
 
-  if (!profile?.is_active) return 'inactive'
-  return profile?.role === 'admin' ? '/admin/daily' : '/staff/schedule'
+  if (!profile?.is_active) return { dest: 'inactive', mustChangePin: false }
+  return {
+    dest: profile.role === 'admin' ? '/admin/daily' : '/staff/schedule',
+    mustChangePin: !!profile.must_change_pin,
+  }
 }
 
 export const config = {

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase-server'
+import { getSessionUser } from '@/lib/session'
 import { fetchRequestsData, requestMonths } from '@/app/actions/requests'
 import { WishCalendar } from '@/components/staff/WishCalendar'
 import { REQUESTS_ENABLED } from '@/types'
@@ -12,8 +12,7 @@ export default async function RequestsPage({
   // 希望は別ツールで集めるため、当面は確定シフトへ
   if (!REQUESTS_ENABLED) redirect('/staff/schedule')
 
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const months = await requestMonths()

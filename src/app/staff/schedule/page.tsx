@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
+import { getSessionUser } from '@/lib/session'
 import { todayJST, monthRange, weekday, WEEK_JA, cn } from '@/lib/utils'
 import { KIND_COLOR, hhmm } from '@/lib/shift-kinds'
 import type { FacilitySlot } from '@/types'
@@ -19,9 +20,9 @@ export default async function SchedulePage({
 }: {
   searchParams: { month?: string; pin?: string }
 }) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
+  const supabase = createClient()
 
   const today = todayJST()
   const month = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : today.slice(0, 7)

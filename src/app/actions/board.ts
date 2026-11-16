@@ -93,20 +93,19 @@ export interface DayBoard extends BoardBase {
 
 export async function fetchDayBoard(date: string): Promise<DayBoard> {
   const empty: DayBoard = { date, facilities: [], slots: [], staff: [], shifts: [], requests: [] }
-  const guard = await requireAdmin()
-  if ('error' in guard) return { ...empty, error: guard.error }
-
-  const base = await loadBase()
-  if (base.error) return { ...empty, error: base.error }
-
+  // 権限チェックと読み込みを同時に始める（権限がなければ結果は返さない）
   const db = createAdminClient()
-  const [shRes, rqRes, moRes] = await Promise.all([
+  const [guard, base, shRes, rqRes, moRes] = await Promise.all([
+    requireAdmin(),
+    loadBase(),
     db.from('shifts')
       .select('id, facility_id, staff_id, date, kind, start_time, end_time, starts_at, ends_at, status')
       .gte('date', addDays(date, -1)).lte('date', addDays(date, 1)),
     db.from('shift_requests').select('staff_id, date, type, start_time, end_time').eq('date', date),
     db.from('min_overrides').select('facility_id, slot_key, min_staff').eq('date', date),
   ])
+  if ('error' in guard) return { ...empty, error: guard.error }
+  if (base.error) return { ...empty, error: base.error }
   const err = shRes.error ?? rqRes.error ?? moRes.error
   if (err) return { ...empty, error: err.message }
 
@@ -197,13 +196,15 @@ export async function setCellShift(input: {
   start?: string
   end?: string
 }): Promise<{ error?: string }> {
-  const guard = await requireAdmin()
-  if ('error' in guard) return { error: guard.error }
-
+  // 権限チェックと既存シフトの確認を同時に行う
   const supabase = createClient()
-  const { data: existing, error: selErr } = await supabase.from('shifts')
-    .select('id, kind, start_time, end_time')
-    .eq('facility_id', input.facilityId).eq('staff_id', input.staffId).eq('date', input.date)
+  const [guard, { data: existing, error: selErr }] = await Promise.all([
+    requireAdmin(),
+    supabase.from('shifts')
+      .select('id, kind, start_time, end_time')
+      .eq('facility_id', input.facilityId).eq('staff_id', input.staffId).eq('date', input.date),
+  ])
+  if ('error' in guard) return { error: guard.error }
   if (selErr) return { error: selErr.message }
 
   if (input.kind === null) {
@@ -268,15 +269,12 @@ const sig = (s: { staff_id: string; date: string; kind: string; start_time: stri
 
 export async function fetchMonthBoard(month: string): Promise<MonthBoard> {
   const empty: MonthBoard = { month, facilities: [], slots: [], staff: [], shifts: [], checkShifts: [], requests: [], publish: [] }
-  const guard = await requireAdmin()
-  if ('error' in guard) return { ...empty, error: guard.error }
-
-  const base = await loadBase()
-  if (base.error) return { ...empty, error: base.error }
-
+  // 権限チェックと読み込みを同時に始める（権限がなければ結果は返さない）
   const { from, to } = monthRange(month)
   const db = createAdminClient()
-  const [shRes, pbRes, rqRes] = await Promise.all([
+  const [guard, base, shRes, pbRes, rqRes] = await Promise.all([
+    requireAdmin(),
+    loadBase(),
     db.from('shifts')
       .select('id, facility_id, staff_id, date, kind, start_time, end_time, starts_at, ends_at, status')
       .gte('date', addDays(from, -1)).lte('date', addDays(to, 1)),
@@ -285,6 +283,8 @@ export async function fetchMonthBoard(month: string): Promise<MonthBoard> {
       .gte('date', from).lte('date', to),
     db.from('shift_requests').select('staff_id, date, type, start_time, end_time').gte('date', from).lte('date', to),
   ])
+  if ('error' in guard) return { ...empty, error: guard.error }
+  if (base.error) return { ...empty, error: base.error }
   const err = shRes.error ?? pbRes.error ?? rqRes.error
   if (err) return { ...empty, error: err.message }
 
@@ -335,18 +335,17 @@ export interface RequestBoard extends BoardBase {
 
 export async function fetchRequestBoard(month: string): Promise<RequestBoard> {
   const empty: RequestBoard = { month, facilities: [], slots: [], staff: [], requests: [], submissions: [] }
-  const guard = await requireAdmin()
-  if ('error' in guard) return { ...empty, error: guard.error }
-
-  const base = await loadBase()
-  if (base.error) return { ...empty, error: base.error }
-
+  // 権限チェックと読み込みを同時に始める（権限がなければ結果は返さない）
   const { from, to } = monthRange(month)
   const db = createAdminClient()
-  const [rqRes, sbRes] = await Promise.all([
+  const [guard, base, rqRes, sbRes] = await Promise.all([
+    requireAdmin(),
+    loadBase(),
     db.from('shift_requests').select('staff_id, date, type, start_time, end_time').gte('date', from).lte('date', to),
     db.from('request_submissions').select('staff_id, submitted_at, extended_until').eq('month', `${month}-01`),
   ])
+  if ('error' in guard) return { ...empty, error: guard.error }
+  if (base.error) return { ...empty, error: base.error }
   const err = rqRes.error ?? sbRes.error
   if (err) return { ...empty, error: err.message }
 

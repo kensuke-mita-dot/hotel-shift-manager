@@ -87,7 +87,6 @@ export function DailyClient({ board, facility }: { board: DayBoard; facility: st
               requestBy={requestBy}
               violations={violations.filter(v => relevant(v, f.id, date, board.shifts))}
               facilities={board.facilities}
-              onChanged={() => router.refresh()}
             />
           ))}
         </div>
@@ -150,7 +149,6 @@ function FacilityCard(props: {
   requestBy: Map<string, DayBoard['requests']>
   violations: Violation[]
   facilities: Facility[]
-  onChanged: () => void
 }) {
   const { facility, slots, shifts, violations } = props
   const rows = boardRows(slots)
@@ -205,7 +203,6 @@ function SlotRow(props: {
   staffById: Map<string, BoardStaff>
   requestBy: Map<string, DayBoard['requests']>
   facilities: Facility[]
-  onChanged: () => void
 }) {
   const { row, rowShifts, coverCount, facility, date } = props
   const [adding, setAdding] = useState(false)
@@ -216,7 +213,6 @@ function SlotRow(props: {
     start(async () => {
       const r = await removeShift(s.id)
       if (r.error) { toast.error(r.error); return }
-      props.onChanged()
     })
   }
 
@@ -276,7 +272,6 @@ function AddForm(props: {
   staff: BoardStaff[]
   requestBy: Map<string, DayBoard['requests']>
   facilities: Facility[]
-  onChanged: () => void
   onClose: () => void
 }) {
   const { row, facility, date, allDayShifts, staff, requestBy } = props
@@ -311,7 +306,6 @@ function AddForm(props: {
       })
       if (r.error) { toast.error(r.error); return }
       setStaffId('')
-      props.onChanged()
       props.onClose()
     })
   }
