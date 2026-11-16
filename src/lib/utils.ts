@@ -90,3 +90,25 @@ export function facilitySummary(s: { primaryFacilityId: string | null; facilityI
 export function mainFacility(s: { primaryFacilityId: string | null; facilityIds: string[] }): string | null {
   return s.primaryFacilityId ?? s.facilityIds[0] ?? null
 }
+
+// ─── 施設の選択（URL の ?facility=） ──────────────────────────
+// 'all'（または未指定）＝全施設。複数選ぶときは 'BHJ,MAHT' のようにカンマ区切り。
+
+/** URL の facility を施設IDの配列に。空配列は「全施設」 */
+export function parseFacilityParam(param: string | null | undefined): string[] {
+  if (!param || param === 'all') return []
+  return param.split(',').map(s => s.trim()).filter(Boolean)
+}
+
+/** 施設チップを押したときの次の facility（押した施設を足す／外す。全部外れたら全施設） */
+export function toggleFacilityParam(param: string | null | undefined, id: string): string {
+  if (id === 'all') return 'all'
+  const cur = parseFacilityParam(param)
+  const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]
+  return next.length ? next.join(',') : 'all'
+}
+
+/** その施設が選択に含まれるか（全施設なら常に true） */
+export function inFacilitySelection(selected: string[], id: string): boolean {
+  return selected.length === 0 || selected.includes(id)
+}

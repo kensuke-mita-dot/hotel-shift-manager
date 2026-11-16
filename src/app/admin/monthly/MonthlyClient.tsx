@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Send, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { publishMonth, setCellShift, type MonthBoard, type BoardShift } from '@/app/actions/board'
-import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, KIND_OFF, KIND_PAID, hhmm, boardRows, bothTimes, isWorkKind, kindLabel } from '@/lib/shift-kinds'
+import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, KIND_OFF, KIND_PAID, hhmm, boardRows, bothTimes, isWorkKind, kindLabel, slotName } from '@/lib/shift-kinds'
 import { requestText, adoptionStats } from '@/lib/requests'
 import { coversSlot, runAllChecks } from '@/lib/rules'
-import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays } from '@/lib/utils'
+import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays, parseFacilityParam, inFacilitySelection } from '@/lib/utils'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -30,15 +30,18 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   const { days } = monthRange(month)
   const dates = Array.from({ length: days }, (_, i) => `${month}-${pad(i + 1)}`)
 
-  const isAll = facility === 'all'
-  // 施設を選んでいるときは、表のマスから直接シフトを入れられる
+  const sel = parseFacilityParam(facility)  // 空＝全施設
+  const isAll = sel.length === 0
+  // 施設を選んでいるときは、表のマスから直接シフトを入れられる（複数選んでいるときは入力パネルで施設を選ぶ）
   const editable = !isAll
+  // マスの中に施設名を出すか（施設を1つに絞っているときは不要）
+  const showFacility = sel.length !== 1
 
   // 画面上のシフト（保存は1マスずつ。表示は先に反映し、サーバーの最新が届いたら置き換え）
   const [allShifts, setAllShifts] = useState<BoardShift[]>(board.checkShifts)
   useEffect(() => { setAllShifts(board.checkShifts) }, [board.checkShifts])
   const monthShifts = allShifts.filter(s => s.date >= dates[0] && s.date <= dates[dates.length - 1])
-  const shifts = isAll ? monthShifts : monthShifts.filter(s => s.facility_id === facility)
+  const shifts = monthShifts.filter(s => inFacilitySelection(sel, s.facility_id))
 
   // 希望（空いているマスに薄く表示）
   const reqBy = useMemo(() => {
@@ -62,37 +65,69 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   }, [allShifts, board.slots])
 
   // 入力パネル
-  const [selected, setSelected] = useState<{ staffId: string; date: string } | null>(null)
+  const [selected, setSelected] = useState<{ staffId: string; date: string; facilityId: string } | null>(null)
   const [floatStart, setFloatStart] = useState('10:00')
   const [floatEnd, setFloatEnd] = useState('15:00')
+  // 浮きを人数に数える枠（'' なら数えない）
+  const [floatCover, setFloatCover] = useState('')
 
   // 行：シフト対象の人のうち、この施設の所属か、この月にこの施設で入っている人
   const withShift = new Set(shifts.map(s => s.staff_id))
   const facilityName = new Map(board.facilities.map(f => [f.id, f.name]))
-  const rows = board.staff.filter(s => isAll || s.facilityIds.includes(facility) || withShift.has(s.id))
+  const rows = board.staff.filter(s => s.facilityIds.some(f => inFacilitySelection(sel, f)) || withShift.has(s.id))
 
+  // マスに出すシフト。有給は「人×日」で1つなので、どの施設で入れたものでも1つだけ出す
   const cell = useMemo(() => {
     const map = new Map<string, BoardShift[]>()
     for (const s of shifts) {
+      if (s.kind === KIND_PAID) continue
       const k = `${s.staff_id}|${s.date}`
       map.set(k, [...(map.get(k) ?? []), s])
     }
     return map
   }, [shifts])
+  const leaveBy = useMemo(() => {
+    const map = new Map<string, BoardShift>()
+    for (const s of monthShifts) {
+      const k = `${s.staff_id}|${s.date}`
+      if (s.kind === KIND_PAID && !map.has(k)) map.set(k, s)
+    }
+    return map
+  }, [monthShifts])
 
-  const facilitySlots = isAll ? [] : board.slots.filter(s => s.facility_id === facility).sort((a, b) => a.sort - b.sort)
+  const slotsOf = (fid: string) => board.slots.filter(s => s.facility_id === fid).sort((a, b) => a.sort - b.sort)
+  // 入力パネルの施設（選んだマスごと）とその枠
+  const inputFacility = selected?.facilityId ?? null
+  const facilitySlots = inputFacility ? slotsOf(inputFacility) : []
   const kindRows = boardRows(facilitySlots)
+  // 表の下の人数（選んでいる施設ごと）
+  const footSlots = sel.flatMap(fid => slotsOf(fid))
+
+  /** マスを押したときの入力先の施設：その日に入っている施設 → 主な所属 → 所属 → 選択の先頭 */
+  const facilityForCell = (staffId: string, date: string): string => {
+    const here = shifts.find(x => x.staff_id === staffId && x.date === date)
+    if (here) return here.facility_id
+    const st = board.staff.find(x => x.id === staffId)
+    const main = st ? mainFacility(st) : null
+    if (main && sel.includes(main)) return main
+    return st?.facilityIds.find(f => sel.includes(f)) ?? sel[0]
+  }
 
   const nameBy = useMemo(() => new Map(board.staff.map(s => [s.id, s.fullName])), [board.staff])
 
-  const goNext = (cell: { staffId: string; date: string }) => {
+  const goNext = (cell: { staffId: string; date: string; facilityId: string }) => {
     const idx = dates.indexOf(cell.date)
-    setSelected(idx >= 0 && idx < dates.length - 1 ? { staffId: cell.staffId, date: dates[idx + 1] } : null)
+    setSelected(idx >= 0 && idx < dates.length - 1 ? { ...cell, date: dates[idx + 1] } : null)
   }
 
   /** 1マス分を保存して次の日へ（kind = null で外す） */
-  const saveCell = (cell: { staffId: string; date: string }, kind: string | null) => {
+  const saveCell = (cell: { staffId: string; date: string; facilityId: string }, kind: string | null) => {
     if (!editable) return
+    // 外すとき、この施設に何もなく他の施設の有給だけがあるなら、その有給を外す
+    const leave = leaveBy.get(`${cell.staffId}|${cell.date}`)
+    const hasHere = allShifts.some(x => x.staff_id === cell.staffId && x.date === cell.date && x.facility_id === cell.facilityId)
+    const fac = kind === null && !hasHere && leave ? leave.facility_id : cell.facilityId
+    const cover = kind === KIND_CUSTOM && floatCover ? floatCover : null
     let startT = '', endT = ''
     if (kind === KIND_CUSTOM) {
       if (floatStart === floatEnd) { toast.error('浮きの開始と終了が同じです'); return }
@@ -108,39 +143,68 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
     }
 
     const before = allShifts
-    const others = allShifts.filter(x => !(x.staff_id === cell.staffId && x.date === cell.date && x.facility_id === facility))
+    const others = allShifts.filter(x => !(x.staff_id === cell.staffId && x.date === cell.date
+      && (x.facility_id === fac || (kind === KIND_PAID && x.kind === KIND_PAID))))
     const next = kind === null ? others : [...others, {
-      id: `tmp-${cell.staffId}-${cell.date}`, facility_id: facility, staff_id: cell.staffId, date: cell.date, kind,
+      id: `tmp-${cell.staffId}-${cell.date}`, facility_id: fac, staff_id: cell.staffId, date: cell.date, kind,
       start_time: `${startT}:00`, end_time: `${endT}:00`,
       starts_at: `${cell.date}T${startT}:00`,
       ends_at: `${endT <= startT ? addDays(cell.date, 1) : cell.date}T${endT}:00`,
       status: 'draft' as const,
+      covers_slot: cover,
     }]
     setAllShifts(next)
     goNext(cell)
 
     start(async () => {
       const r = await setCellShift({
-        facilityId: facility, date: cell.date, staffId: cell.staffId, kind,
-        ...(kind === KIND_CUSTOM ? { start: startT, end: endT } : {}),
+        facilityId: fac, date: cell.date, staffId: cell.staffId, kind,
+        ...(kind === KIND_CUSTOM ? { start: startT, end: endT, coversSlot: cover } : {}),
       })
       // 画面の更新はサーバー側の revalidatePath で自動的に届く（ここで再読み込みすると二重取得になる）
       if (r.error) { toast.error(r.error); setAllShifts(before); return }
     })
   }
 
-  const selShift = selected ? shifts.find(x => x.staff_id === selected.staffId && x.date === selected.date) : undefined
+  // 選んだマスの今のシフト（この施設のもの。なければ他の施設で入れた有給）
+  const selLeave = selected ? leaveBy.get(`${selected.staffId}|${selected.date}`) : undefined
+  const selShift = selected
+    ? monthShifts.find(x => x.staff_id === selected.staffId && x.date === selected.date && x.facility_id === selected.facilityId) ?? selLeave
+    : undefined
   const selReq = selected ? reqBy.get(`${selected.staffId}|${selected.date}`) ?? [] : []
   const selElsewhere = selected
-    ? monthShifts.filter(x => x.staff_id === selected.staffId && x.date === selected.date && x.facility_id !== facility)
+    ? monthShifts.filter(x => x.staff_id === selected.staffId && x.date === selected.date
+        && x.facility_id !== selected.facilityId && x.id !== selShift?.id)
     : []
 
-  const targets = isAll ? board.facilities.map(f => f.id) : [facility]
+  // マスを選んだら、浮きの時刻と「人数に数える枠」を今のシフト（なければ時間指定の希望）に合わせる
+  const selKey = selected ? `${selected.staffId}|${selected.date}|${selected.facilityId}` : ''
+  useEffect(() => {
+    if (!selected) return
+    const cur = monthShifts.find(x => x.staff_id === selected.staffId && x.date === selected.date
+      && x.facility_id === selected.facilityId)
+    if (cur?.kind === KIND_CUSTOM) {
+      setFloatStart(hhmm(cur.start_time)); setFloatEnd(hhmm(cur.end_time)); setFloatCover(cur.covers_slot ?? '')
+      return
+    }
+    const req = (reqBy.get(`${selected.staffId}|${selected.date}`) ?? []).find(r => r.type === 'custom' && r.start_time && r.end_time)
+    if (req?.start_time && req.end_time) { setFloatStart(hhmm(req.start_time)); setFloatEnd(hhmm(req.end_time)) }
+    setFloatCover('')
+    // マスが変わったときだけ合わせる（入力途中の値を上書きしない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey])
+
+  /** シフトの短い表示（浮きで人数に数える枠があれば「浮夕」のように） */
+  const chipLabel = (x: BoardShift) =>
+    (KIND_SHORT[x.kind] ?? x.kind) + (x.kind === KIND_CUSTOM && x.covers_slot ? KIND_SHORT[x.covers_slot] ?? '' : '')
+  const coverLabel = (key: string | null) => key ? `${slotName(key)}の人数に数える` : ''
+
+  const targets = isAll ? board.facilities.map(f => f.id) : sel
   const publishRows = board.publish.filter(p => targets.includes(p.facilityId))
   const pendingTotal = publishRows.reduce((a, p) => a + p.pendingChanges, 0)
 
   const publish = (ids: string[]) => {
-    const label = ids.length === 1 ? ids[0] : '全施設'
+    const label = ids.length === board.facilities.length ? '全施設' : ids.join('・')
     if (!confirm(`${label} の${m}月のシフトを公開しますか？\nスタッフの「確定シフト」に表示されます。`)) return
     start(async () => {
       const r = await publishMonth(ids, month)
@@ -166,7 +230,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
         <button onClick={() => publish(targets)} disabled={pending}
           className="inline-flex items-center gap-2 h-10 px-4 rounded-btn bg-hs-blue hover:bg-hs-blue-hover text-white text-sm font-medium disabled:opacity-50">
           {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {isAll ? '全施設を公開' : `${facility}を公開`}
+          {isAll ? '全施設を公開' : `${sel.join('・')}を公開`}
           {pendingTotal > 0 && <span className="ml-1 px-1.5 rounded bg-white/25 text-xs">未公開の変更 {pendingTotal}</span>}
         </button>
       </div>
@@ -180,7 +244,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
               ? <span className="text-hs-text-sub">公開 {fmtAt(p.publishedAt)}</span>
               : <span className="text-hs-text-lighter">未公開</span>}
             {p.pendingChanges > 0 && <span className="text-hs-warn">未公開の変更 {p.pendingChanges}件</span>}
-            {isAll && (
+            {targets.length > 1 && (
               <button onClick={() => publish([p.facilityId])} disabled={pending}
                 className="ml-1 text-hs-blue underline disabled:opacity-50">公開</button>
             )}
@@ -237,17 +301,28 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                   </td>
                   {dates.map(d => {
                     const list = cell.get(`${s.id}|${d}`) ?? []
+                    const leave = leaveBy.get(`${s.id}|${d}`)
                     const req = reqBy.get(`${s.id}|${d}`) ?? []
                     const warn = list.map(x => flagged.get(x.id)).filter(Boolean).join('\n')
                     const isSel = selected?.staffId === s.id && selected.date === d
                     const chips = list.map(x => (
-                      <span key={x.id} title={isWorkKind(x.kind) ? `${x.facility_id} ${hhmm(x.start_time)}-${hhmm(x.end_time)}` : `${x.facility_id} ${kindLabel(x.kind, [])}`}
+                      <span key={x.id} title={isWorkKind(x.kind)
+                          ? `${x.facility_id} ${hhmm(x.start_time)}-${hhmm(x.end_time)}${x.covers_slot ? `（${coverLabel(x.covers_slot)}）` : ''}`
+                          : `${x.facility_id} ${kindLabel(x.kind, [])}`}
                         className="block leading-[14px] py-px rounded text-[11px] font-medium text-white"
                         style={{ background: KIND_COLOR[x.kind] ?? '#888' }}>
-                        {isAll ? `${x.facility_id.slice(0, 4)}` : ''}{KIND_SHORT[x.kind] ?? x.kind}
+                        {showFacility ? `${x.facility_id.slice(0, 4)}` : ''}{chipLabel(x)}
                       </span>
                     ))
-                    const reqHint = list.length === 0 && req.length > 0 && (
+                    // 有給は施設に関係なく1つだけ出す
+                    if (leave) chips.push(
+                      <span key={leave.id} title={`有給（${leave.facility_id}で登録）`}
+                        className="block leading-[14px] py-px rounded text-[11px] font-medium text-white"
+                        style={{ background: KIND_COLOR[KIND_PAID] }}>
+                        {KIND_SHORT[KIND_PAID]}
+                      </span>
+                    )
+                    const reqHint = chips.length === 0 && req.length > 0 && (
                       <span className={cn('block text-[10px] leading-[14px]',
                         req.some(r => r.type === 'off') ? 'text-hs-danger/50' : 'text-hs-text-lighter')}>
                         {requestText(req, { withTime: false })}
@@ -260,7 +335,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                     return (
                       <td key={d} className="p-0.5 border-b border-l border-hs-border text-center align-middle">
                         {editable ? (
-                          <button onClick={() => setSelected({ staffId: s.id, date: d })} className={cls} title={title}>
+                          <button onClick={() => setSelected({ staffId: s.id, date: d, facilityId: facilityForCell(s.id, d) })} className={cls} title={title}>
                             {chips}{reqHint}
                           </button>
                         ) : (
@@ -291,15 +366,16 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
               </td></tr>
             )}
           </tbody>
-          {facilitySlots.length > 0 && (
+          {footSlots.length > 0 && (
             <tfoot>
-              {facilitySlots.map(slot => (
-                <tr key={slot.key} className="bg-hs-gray-lighter">
+              {footSlots.map(slot => (
+                <tr key={`${slot.facility_id}-${slot.key}`} className="bg-hs-gray-lighter">
                   <td className="sticky left-0 z-10 bg-hs-gray-lighter px-3 py-1 border-t border-hs-border whitespace-nowrap text-hs-text-sub">
+                    {sel.length > 1 && <span className="mr-1 font-medium">{slot.facility_id}</span>}
                     {slot.key === 'base' ? '基本' : slot.label}の人数
                   </td>
                   {dates.map(d => {
-                    const n = shifts.filter(x => x.date === d && coversSlot(x.kind, slot.key)).length
+                    const n = shifts.filter(x => x.facility_id === slot.facility_id && x.date === d && coversSlot(x, slot.key)).length
                     const short = n < slot.min_staff
                     return (
                       <td key={d} className={cn('px-0.5 py-1 border-t border-l border-hs-border text-center tabular-nums',
@@ -333,12 +409,30 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
           <div className="max-w-5xl mx-auto">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="text-sm font-medium text-hs-text">
-                {nameBy.get(selected.staffId)}　{Number(selected.date.slice(5, 7))}/{Number(selected.date.slice(8))}（{WEEK_JA[weekday(selected.date)]}）{facility}
+                {nameBy.get(selected.staffId)}　{Number(selected.date.slice(5, 7))}/{Number(selected.date.slice(8))}（{WEEK_JA[weekday(selected.date)]}）
               </span>
+              {sel.length > 1 ? (
+                <span className="inline-flex items-center gap-1" role="group" aria-label="入れる施設">
+                  {sel.map(fid => (
+                    <button key={fid} onClick={() => setSelected({ ...selected, facilityId: fid })}
+                      aria-pressed={selected.facilityId === fid}
+                      className={cn('h-7 px-2 rounded text-xs font-medium',
+                        selected.facilityId === fid ? 'bg-hs-blue text-white' : 'bg-hs-gray-light text-hs-text hover:bg-hs-blue-bg')}>
+                      {fid}
+                    </button>
+                  ))}
+                </span>
+              ) : (
+                <span className="text-sm font-medium text-hs-text">{selected.facilityId}</span>
+              )}
               <span className="text-xs text-hs-text-sub">
-                今：{selShift ? (isWorkKind(selShift.kind) ? `${KIND_SHORT[selShift.kind] ?? selShift.kind} ${hhmm(selShift.start_time)}-${hhmm(selShift.end_time)}` : kindLabel(selShift.kind, [])) : 'なし'}
+                今：{selShift
+                  ? (isWorkKind(selShift.kind)
+                      ? `${chipLabel(selShift)} ${hhmm(selShift.start_time)}-${hhmm(selShift.end_time)}${selShift.covers_slot ? `（${coverLabel(selShift.covers_slot)}）` : ''}`
+                      : `${kindLabel(selShift.kind, [])}${selShift.facility_id !== selected.facilityId ? `（${selShift.facility_id}で登録）` : ''}`)
+                  : 'なし'}
                 {selReq.length > 0 && <>　希望：{requestText(selReq)}</>}
-                {selElsewhere.length > 0 && <span className="text-hs-warn">　{selElsewhere.map(x => `${x.facility_id}${KIND_SHORT[x.kind] ?? ''}`).join('・')}に配置済</span>}
+                {selElsewhere.length > 0 && <span className="text-hs-warn">　{selElsewhere.map(x => `${x.facility_id}${chipLabel(x)}`).join('・')}に配置済</span>}
               </span>
               {pending && <Loader2 className="w-4 h-4 animate-spin text-hs-text-lighter" />}
               <button onClick={() => setSelected(null)} className="ml-auto h-8 w-8 inline-flex items-center justify-center rounded hover:bg-hs-gray-lighter" aria-label="閉じる">
@@ -362,6 +456,14 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                 <span className="text-hs-text-sub">〜</span>
                 <input type="time" value={floatEnd} onChange={e => setFloatEnd(e.target.value)} step={900}
                   className="h-10 px-2 rounded-btn border border-hs-input-border text-base md:text-sm" aria-label="浮きの終了" />
+                <select value={floatCover} onChange={e => setFloatCover(e.target.value)} aria-label="浮きを人数に数える枠"
+                  title="欠員を埋めるときなど、この浮きを朝勤・夕勤などの人数に数えます"
+                  className="h-10 px-2 rounded-btn border border-hs-input-border bg-white text-base md:text-sm">
+                  <option value="">人数に数えない</option>
+                  {facilitySlots.map(sl => (
+                    <option key={sl.key} value={sl.key}>{slotName(sl.key)}として数える</option>
+                  ))}
+                </select>
                 <button onClick={() => saveCell(selected, KIND_CUSTOM)}
                   className={cn('h-10 px-3 rounded-btn text-sm font-medium text-white', selShift?.kind === KIND_CUSTOM && 'ring-2 ring-offset-1 ring-hs-blue')}
                   style={{ background: KIND_COLOR.custom }}>
