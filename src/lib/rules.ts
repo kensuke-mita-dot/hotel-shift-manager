@@ -14,6 +14,8 @@ export interface ShiftEntry {
   end_time: string    // 'HH:MM:SS'（翌日終了のとき end < start）
   starts_at: string   // 'YYYY-MM-DD HH:MM:SS'（DB の生成列）
   ends_at: string     // 'YYYY-MM-DD HH:MM:SS'
+  /** 浮きを朝・夕などの人数に数えるときの枠（null なら数えない） */
+  covers_slot?: string | null
 }
 
 /** 施設・枠の定義（min_overrides 適用済みの min_staff を渡す） */
@@ -53,9 +55,14 @@ function toMin(ts: string): number {
   return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 60000
 }
 
-/** その枠の人数に数えるシフトか（朝夕通しは朝枠・夕枠の両方に数える。浮きは数えない） */
-export function coversSlot(kind: string, slotKey: string): boolean {
+/**
+ * その枠の人数に数えるシフトか。
+ * 朝夕通しは朝枠・夕枠の両方に数える。浮きは、数える枠（covers_slot）を指定したときだけ数える。
+ */
+export function coversSlot(shift: { kind: string; covers_slot?: string | null }, slotKey: string): boolean {
+  const { kind } = shift
   if (kind === slotKey) return true
+  if (kind === 'custom') return !!shift.covers_slot && shift.covers_slot === slotKey
   return kind === 'both' && (slotKey === 'morning' || slotKey === 'evening')
 }
 
@@ -154,7 +161,7 @@ export function checkUnderstaffed(
   )
 
   for (const slot of facilitySlots) {
-    const matched = dayShifts.filter(s => coversSlot(s.kind, slot.key))
+    const matched = dayShifts.filter(s => coversSlot(s, slot.key))
     if (matched.length < slot.min_staff) {
       violations.push({
         type: 'understaffed',
@@ -186,8 +193,8 @@ export function checkBothCoverage(
     const dayShifts = shifts.filter(
       s => s.staff_id === req.staff_id && s.date === req.date
     )
-    const hasMorning = dayShifts.some(s => coversSlot(s.kind, 'morning'))
-    const hasEvening = dayShifts.some(s => coversSlot(s.kind, 'evening'))
+    const hasMorning = dayShifts.some(s => coversSlot(s, 'morning'))
+    const hasEvening = dayShifts.some(s => coversSlot(s, 'evening'))
 
     if (hasMorning && hasEvening) continue  // OK
 

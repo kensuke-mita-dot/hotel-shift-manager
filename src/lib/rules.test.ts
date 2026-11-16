@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   checkInterval,
+  coversSlot,
   checkOverlap,
   checkUnderstaffed,
   checkBothCoverage,
@@ -341,5 +342,14 @@ describe('朝夕通し', () => {
   it('浮きは枠の人数に数えない', () => {
     const shifts = [makeShift('a', 'BHJ', '2026-12-01', '10:00', '15:00', 'custom')]
     expect(checkUnderstaffed(shifts, slots, 'BHJ', '2026-12-01')).toHaveLength(2)
+  })
+})
+
+describe('浮きを人数に数える', () => {
+  it('指定がなければ数えない／指定した枠だけ数える', () => {
+    expect(coversSlot({ kind: 'custom' }, 'evening')).toBe(false)
+    expect(coversSlot({ kind: 'custom', covers_slot: 'evening' }, 'evening')).toBe(true)
+    expect(coversSlot({ kind: 'custom', covers_slot: 'evening' }, 'morning')).toBe(false)
+    expect(coversSlot({ kind: 'both' }, 'evening')).toBe(true)
   })
 })

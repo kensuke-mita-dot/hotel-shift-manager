@@ -107,3 +107,8 @@ export function workMinutes(start: string, end: string): { paid: number; lateNig
 
   return { paid, lateNight: Math.min(late, paid), span }
 }
+
+/** 枠の呼び名（浮きを「夕勤として数える」などの表示用） */
+export function slotName(key: string): string {
+  return ({ morning: '朝勤', evening: '夕勤', night: '夜勤', base: '基本' } as Record<string, string>)[key] ?? key
+}

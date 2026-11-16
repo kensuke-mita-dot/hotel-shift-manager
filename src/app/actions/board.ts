@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth-guard'
 import { addDays, monthRange, facilityRank, mainFacility, compareStaffInFacility } from '@/lib/utils'
-import { KIND_BOTH, KIND_CUSTOM, LEAVE_KINDS, bothTimes } from '@/lib/shift-kinds'
+import { KIND_BOTH, KIND_CUSTOM, KIND_PAID, LEAVE_KINDS, bothTimes } from '@/lib/shift-kinds'
 import type { Facility, FacilitySlot, RequestType } from '@/types'
 import { validateDayRequests } from '@/lib/requests'
 
@@ -30,6 +30,8 @@ export interface BoardShift {
   starts_at: string
   ends_at: string
   status: 'draft' | 'confirmed'
+  /** 浮きを朝・夕などの人数に数えるときの枠（null なら数えない） */
+  covers_slot: string | null
 }
 
 export interface BoardRequest {
@@ -99,7 +101,7 @@ export async function fetchDayBoard(date: string): Promise<DayBoard> {
     requireAdmin(),
     loadBase(),
     db.from('shifts')
-      .select('id, facility_id, staff_id, date, kind, start_time, end_time, starts_at, ends_at, status')
+      .select('id, facility_id, staff_id, date, kind, start_time, end_time, starts_at, ends_at, status, covers_slot')
       .gte('date', addDays(date, -1)).lte('date', addDays(date, 1)),
     db.from('shift_requests').select('staff_id, date, type, start_time, end_time').eq('date', date),
     db.from('min_overrides').select('facility_id, slot_key, min_staff').eq('date', date),
@@ -132,6 +134,8 @@ export async function addShift(input: {
   kind: string
   start?: string
   end?: string
+  /** 浮きのとき：人数に数える枠（'morning' | 'evening' など。null・未指定なら数えない） */
+  coversSlot?: string | null
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin()
   if ('error' in guard) return { error: guard.error }
@@ -148,6 +152,7 @@ export async function addShift(input: {
     }
     if (input.start === input.end) return { error: '開始と終了が同じ時刻です' }
     start = input.start; end = input.end
+    if (input.coversSlot && !fs.some(x => x.key === input.coversSlot)) return { error: '人数に数える枠が見つかりません' }
   } else if (LEAVE_KINDS.includes(input.kind)) {
     // 休み・有給は勤務ではないので時刻なし（00:00-00:00 で保存）
     start = '00:00'; end = '00:00'
@@ -173,6 +178,8 @@ export async function addShift(input: {
     source: 'admin',
     status: 'draft',
     updated_by: guard.userId,
+    // 浮き以外では使わない。未指定なら列に触れない（SQL 010 未適用でも動くように）
+    ...(input.kind === KIND_CUSTOM && input.coversSlot ? { covers_slot: input.coversSlot } : {}),
   })
   if (error) {
     if (/duplicate|unique/i.test(error.message)) {
@@ -180,6 +187,15 @@ export async function addShift(input: {
     }
     return { error: error.message }
   }
+
+  // 有給は「人×日」で1つ。ほかの施設に入っている有給は外す
+  if (input.kind === KIND_PAID) {
+    const { error: delErr } = await supabase.from('shifts').delete()
+      .eq('staff_id', input.staffId).eq('date', input.date).eq('kind', KIND_PAID)
+      .neq('facility_id', input.facilityId)
+    if (delErr) return { error: delErr.message }
+  }
+
   revalidatePath('/admin', 'layout')
   return {}
 }
@@ -195,13 +211,14 @@ export async function setCellShift(input: {
   kind: string | null
   start?: string
   end?: string
+  coversSlot?: string | null
 }): Promise<{ error?: string }> {
   // 権限チェックと既存シフトの確認を同時に行う
   const supabase = createClient()
   const [guard, { data: existing, error: selErr }] = await Promise.all([
     requireAdmin(),
     supabase.from('shifts')
-      .select('id, kind, start_time, end_time')
+      .select('id, kind, start_time, end_time, covers_slot')
       .eq('facility_id', input.facilityId).eq('staff_id', input.staffId).eq('date', input.date),
   ])
   if ('error' in guard) return { error: guard.error }
@@ -222,14 +239,14 @@ export async function setCellShift(input: {
   }
   const r = await addShift({
     facilityId: input.facilityId, date: input.date, staffId: input.staffId,
-    kind: input.kind, start: input.start, end: input.end,
+    kind: input.kind, start: input.start, end: input.end, coversSlot: input.coversSlot,
   })
   if (r.error && existing?.length) {
     // 失敗したら元に戻す
     const e = existing[0]
     await addShift({
       facilityId: input.facilityId, date: input.date, staffId: input.staffId,
-      kind: e.kind, start: e.start_time.slice(0, 5), end: e.end_time.slice(0, 5),
+      kind: e.kind, start: e.start_time.slice(0, 5), end: e.end_time.slice(0, 5), coversSlot: e.covers_slot,
     })
   }
   return r
@@ -276,7 +293,7 @@ export async function fetchMonthBoard(month: string): Promise<MonthBoard> {
     requireAdmin(),
     loadBase(),
     db.from('shifts')
-      .select('id, facility_id, staff_id, date, kind, start_time, end_time, starts_at, ends_at, status')
+      .select('id, facility_id, staff_id, date, kind, start_time, end_time, starts_at, ends_at, status, covers_slot')
       .gte('date', addDays(from, -1)).lte('date', addDays(to, 1)),
     db.from('published_shifts')
       .select('facility_id, staff_id, date, kind, start_time, end_time, published_at')

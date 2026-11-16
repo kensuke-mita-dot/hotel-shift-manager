@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { setDayRequestsAsAdmin, type RequestBoard, type BoardRequest } from '@/app/actions/board'
 import { normalizeRequests, requestText, validateDayRequests, MAX_TIME_RANGES } from '@/lib/requests'
-import { monthRange, weekday, WEEK_JA, cn, mainFacility } from '@/lib/utils'
+import { monthRange, weekday, WEEK_JA, cn, mainFacility, parseFacilityParam } from '@/lib/utils'
 import { hhmm } from '@/lib/shift-kinds'
 import { REQUEST_LABEL } from '@/types'
 import type { RequestType } from '@/types'
@@ -57,9 +57,10 @@ export function RequestsClient({ board, facility }: { board: RequestBoard; facil
   const [pending, start] = useTransition()
 
   const facilityName = new Map(board.facilities.map(f => [f.id, f.name]))
-  const rows = facility === 'all'
+  const sel = parseFacilityParam(facility)  // 空＝全施設
+  const rows = sel.length === 0
     ? board.staff
-    : board.staff.filter(s => s.facilityIds.includes(facility))
+    : board.staff.filter(s => s.facilityIds.some(f => sel.includes(f)))
   const subBy = useMemo(() => new Map(board.submissions.map(s => [s.staff_id, s])), [board.submissions])
   const nameBy = useMemo(() => new Map(board.staff.map(s => [s.id, s.fullName])), [board.staff])
 

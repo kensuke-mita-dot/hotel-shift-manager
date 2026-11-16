@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import { todayJST, nextMonthJST } from '@/lib/utils'
+import { todayJST, nextMonthJST, parseFacilityParam, toggleFacilityParam } from '@/lib/utils'
 
 const FACILITIES = [
   { label: '全施設', param: 'all' },
@@ -19,6 +19,8 @@ function AdminTabsInner() {
   const searchParams = useSearchParams()
 
   const facility = searchParams.get('facility') ?? 'all'
+  // 施設は複数選べる（押すたびに足す／外す）。「全施設」で解除
+  const selected = parseFacilityParam(facility)
   // 日付と月は画面間で引き継ぐ（日次→月間はその日の月、月間→日次はその月の1日）
   const qDate    = searchParams.get('date')
   const qMonth   = searchParams.get('month')
@@ -63,11 +65,12 @@ function AdminTabsInner() {
       {showFacilitySwitcher && (
         <div className="flex items-center gap-1.5 px-4 pb-2.5 overflow-x-auto scrollbar-none">
           {FACILITIES.map(({ label, param }) => {
-            const active = facility === param
+            const active = param === 'all' ? selected.length === 0 : selected.includes(param)
             return (
               <Link
                 key={param}
-                href={facilityHref(param)}
+                href={facilityHref(toggleFacilityParam(facility, param))}
+                aria-pressed={active}
                 className={`flex-shrink-0 px-3 h-8 flex items-center rounded-[6px] text-sm font-medium transition-colors
                   ${active
                     ? 'bg-hs-blue text-white'

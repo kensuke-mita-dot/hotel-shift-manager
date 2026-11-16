@@ -17,6 +17,8 @@ export interface MyProfile {
 
 /** ログイン中のユーザー（未ログインなら null）。トークンは Supabase Auth で検証される */
 export const getSessionUser = cache(async () => {
+  // Supabase 未設定（ビルド時・ローカルの見た目確認など）は未ログイン扱い
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return null
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   return user

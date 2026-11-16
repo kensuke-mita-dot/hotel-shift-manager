@@ -6,16 +6,17 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, X, AlertTriangle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { addShift, removeShift, type DayBoard, type BoardShift, type BoardStaff } from '@/app/actions/board'
-import { boardRows, kindLabel, hhmm, KIND_COLOR, KIND_CUSTOM, type BoardRow, isWorkKind } from '@/lib/shift-kinds'
+import { boardRows, kindLabel, hhmm, KIND_COLOR, KIND_CUSTOM, type BoardRow, isWorkKind, slotName } from '@/lib/shift-kinds'
 import { runAllChecks, coversSlot, type Violation } from '@/lib/rules'
-import { addDays, weekday, WEEK_JA, cn, facilitySummary } from '@/lib/utils'
+import { addDays, weekday, WEEK_JA, cn, facilitySummary, parseFacilityParam } from '@/lib/utils'
 import { requestText } from '@/lib/requests'
 import type { Facility, FacilitySlot } from '@/types'
 
 export function DailyClient({ board, facility }: { board: DayBoard; facility: string }) {
   const { date } = board
   const router = useRouter()
-  const visible = facility === 'all' ? board.facilities : board.facilities.filter(f => f.id === facility)
+  const sel = parseFacilityParam(facility)  // 空＝全施設
+  const visible = sel.length === 0 ? board.facilities : board.facilities.filter(f => sel.includes(f.id))
 
   const dayShifts = board.shifts.filter(s => s.date === date)
   const staffById = useMemo(() => new Map(board.staff.map(s => [s.id, s])), [board.staff])
@@ -41,9 +42,9 @@ export function DailyClient({ board, facility }: { board: DayBoard; facility: st
   // 休み・有給の人は「入っていない人」の一覧に、その旨を出す
   const assignedIds = new Set(dayShifts.filter(s => isWorkKind(s.kind)).map(s => s.staff_id))
   const leaveBy = new Map(dayShifts.filter(s => !isWorkKind(s.kind)).map(s => [s.staff_id, s.kind]))
-  const scopeStaff = facility === 'all'
+  const scopeStaff = sel.length === 0
     ? board.staff
-    : board.staff.filter(s => s.facilityIds.includes(facility))
+    : board.staff.filter(s => s.facilityIds.some(f => sel.includes(f)))
   const unassigned = scopeStaff.filter(s => !assignedIds.has(s.id))
 
   return (
@@ -166,7 +167,7 @@ function FacilityCard(props: {
         {rows.map(row => (
           <SlotRow key={row.kind} row={row} {...props}
             rowShifts={shifts.filter(s => s.kind === row.kind)}
-            coverCount={row.min === null ? null : shifts.filter(s => coversSlot(s.kind, row.kind)).length}
+            coverCount={row.min === null ? null : shifts.filter(s => coversSlot(s, row.kind)).length}
           />
         ))}
       </div>
@@ -197,6 +198,7 @@ function SlotRow(props: {
   rowShifts: BoardShift[]
   coverCount: number | null
   facility: Facility
+  slots: FacilitySlot[]
   date: string
   allDayShifts: BoardShift[]
   staff: BoardStaff[]
@@ -222,7 +224,7 @@ function SlotRow(props: {
         <span className="w-2 h-2 rounded-full" style={{ background: KIND_COLOR[row.kind] ?? '#999' }} />
         <span className="text-sm font-medium text-hs-text">{row.label}</span>
         {row.start && row.end && <span className="text-xs text-hs-text-sub">{hhmm(row.start)}〜{hhmm(row.end)}</span>}
-        {row.kind === KIND_CUSTOM && <span className="text-xs text-hs-text-sub">時間を指定。枠の人数には数えません</span>}
+        {row.kind === KIND_CUSTOM && <span className="text-xs text-hs-text-sub">時間を指定。指定したときだけ朝勤・夕勤などの人数に数えます</span>}
         {coverCount !== null && row.min !== null && (
           <span className={cn('ml-auto text-xs px-2 py-0.5 rounded-chip font-medium',
             short ? 'bg-hs-danger text-white' : 'bg-hs-gray-light text-hs-text-sub')}>
@@ -240,6 +242,9 @@ function SlotRow(props: {
             <span key={s.id} className="inline-flex items-center gap-1 pl-2.5 pr-1 h-8 rounded-chip bg-hs-gray-light text-sm text-hs-text">
               {p?.fullName ?? '（削除済み）'}
               {row.kind === KIND_CUSTOM && <span className="text-xs text-hs-text-sub">{hhmm(s.start_time)}-{hhmm(s.end_time)}</span>}
+              {row.kind === KIND_CUSTOM && s.covers_slot && (
+                <span className="text-[10px] px-1 rounded bg-hs-blue-bg text-hs-blue">{slotName(s.covers_slot)}として数える</span>
+              )}
               {help && <span className="text-[10px] px-1 rounded bg-hs-warn-bg text-hs-warn">ヘルプ</span>}
               <button onClick={() => remove(s)} disabled={pending}
                 className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-white text-hs-text-lighter hover:text-hs-danger"
@@ -272,6 +277,7 @@ function AddForm(props: {
   staff: BoardStaff[]
   requestBy: Map<string, DayBoard['requests']>
   facilities: Facility[]
+  slots: FacilitySlot[]
   onClose: () => void
 }) {
   const { row, facility, date, allDayShifts, staff, requestBy } = props
@@ -279,6 +285,7 @@ function AddForm(props: {
   const [staffId, setStaffId] = useState('')
   const [startT, setStartT]   = useState('10:00')
   const [endT, setEndT]       = useState('15:00')
+  const [cover, setCover]     = useState('')  // 浮きを人数に数える枠（'' なら数えない）
   const [pending, start]      = useTransition()
 
   const hereIds = new Set(allDayShifts.filter(s => s.facility_id === facility.id).map(s => s.staff_id))
@@ -302,7 +309,7 @@ function AddForm(props: {
     start(async () => {
       const r = await addShift({
         facilityId: facility.id, date, staffId, kind: row.kind,
-        ...(row.kind === KIND_CUSTOM ? { start: startT, end: endT } : {}),
+        ...(row.kind === KIND_CUSTOM ? { start: startT, end: endT, coversSlot: cover || null } : {}),
       })
       if (r.error) { toast.error(r.error); return }
       setStaffId('')
@@ -338,6 +345,16 @@ function AddForm(props: {
             <label className="text-xs text-hs-text-sub block mb-1">終了</label>
             <input type="time" value={endT} onChange={e => setEndT(e.target.value)} step={900}
               className="h-10 px-2 rounded-btn border border-hs-input-border bg-white text-base md:text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-hs-text-sub block mb-1">人数に数える</label>
+            <select value={cover} onChange={e => setCover(e.target.value)}
+              className="h-10 px-2 rounded-btn border border-hs-input-border bg-white text-base md:text-sm">
+              <option value="">数えない</option>
+              {props.slots.map(sl => (
+                <option key={sl.key} value={sl.key}>{slotName(sl.key)}として数える</option>
+              ))}
+            </select>
           </div>
         </div>
       )}
