@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Send, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { publishMonth, setCellShift, type MonthBoard, type BoardShift } from '@/app/actions/board'
-import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, KIND_OFF, KIND_PAID, hhmm, boardRows, bothTimes, isWorkKind, kindLabel, slotName } from '@/lib/shift-kinds'
+import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, KIND_OFF, KIND_PAID, hhmm, boardRows, bothTimes, isWorkKind, kindLabel, slotName, LEAVE_KINDS } from '@/lib/shift-kinds'
 import { requestText, adoptionStats } from '@/lib/requests'
 import { coversSlot, runAllChecks } from '@/lib/rules'
 import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays, parseFacilityParam, inFacilitySelection } from '@/lib/utils'
@@ -76,11 +76,12 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   const facilityName = new Map(board.facilities.map(f => [f.id, f.name]))
   const rows = board.staff.filter(s => s.facilityIds.some(f => inFacilitySelection(sel, f)) || withShift.has(s.id))
 
-  // マスに出すシフト。有給は「人×日」で1つなので、どの施設で入れたものでも1つだけ出す
+  // マスに出すシフト（選んでいる施設の勤務）。
+  // 休み・有給は「人×日」で1つなので、どの施設で入れたものでも施設名なしで1つだけ出す
   const cell = useMemo(() => {
     const map = new Map<string, BoardShift[]>()
     for (const s of shifts) {
-      if (s.kind === KIND_PAID) continue
+      if (!isWorkKind(s.kind)) continue
       const k = `${s.staff_id}|${s.date}`
       map.set(k, [...(map.get(k) ?? []), s])
     }
@@ -89,11 +90,26 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   const leaveBy = useMemo(() => {
     const map = new Map<string, BoardShift>()
     for (const s of monthShifts) {
+      if (isWorkKind(s.kind)) continue
       const k = `${s.staff_id}|${s.date}`
-      if (s.kind === KIND_PAID && !map.has(k)) map.set(k, s)
+      // 両方あるときは有給を優先して出す
+      if (!map.has(k) || s.kind === KIND_PAID) map.set(k, s)
     }
     return map
   }, [monthShifts])
+  // 選んでいない施設での勤務（兼任の人が他の施設で入っている日。薄く出す）
+  const otherBy = useMemo(() => {
+    const map = new Map<string, BoardShift[]>()
+    if (isAll) return map
+    for (const s of monthShifts) {
+      if (!isWorkKind(s.kind) || sel.includes(s.facility_id)) continue
+      const k = `${s.staff_id}|${s.date}`
+      map.set(k, [...(map.get(k) ?? []), s])
+    }
+    return map
+    // sel は facility から決まる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthShifts, facility])
 
   const slotsOf = (fid: string) => board.slots.filter(s => s.facility_id === fid).sort((a, b) => a.sort - b.sort)
   // 入力パネルの施設（選んだマスごと）とその枠
@@ -123,7 +139,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   /** 1マス分を保存して次の日へ（kind = null で外す） */
   const saveCell = (cell: { staffId: string; date: string; facilityId: string }, kind: string | null) => {
     if (!editable) return
-    // 外すとき、この施設に何もなく他の施設の有給だけがあるなら、その有給を外す
+    // 外すとき、この施設に何もなく他の施設の休み・有給だけがあるなら、それを外す
     const leave = leaveBy.get(`${cell.staffId}|${cell.date}`)
     const hasHere = allShifts.some(x => x.staff_id === cell.staffId && x.date === cell.date && x.facility_id === cell.facilityId)
     const fac = kind === null && !hasHere && leave ? leave.facility_id : cell.facilityId
@@ -144,7 +160,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
 
     const before = allShifts
     const others = allShifts.filter(x => !(x.staff_id === cell.staffId && x.date === cell.date
-      && (x.facility_id === fac || (kind === KIND_PAID && x.kind === KIND_PAID))))
+      && (x.facility_id === fac || (kind !== null && LEAVE_KINDS.includes(kind) && LEAVE_KINDS.includes(x.kind)))))
     const next = kind === null ? others : [...others, {
       id: `tmp-${cell.staffId}-${cell.date}`, facility_id: fac, staff_id: cell.staffId, date: cell.date, kind,
       start_time: `${startT}:00`, end_time: `${endT}:00`,
@@ -166,7 +182,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
     })
   }
 
-  // 選んだマスの今のシフト（この施設のもの。なければ他の施設で入れた有給）
+  // 選んだマスの今のシフト（この施設のもの。なければ他の施設で入れた休み・有給）
   const selLeave = selected ? leaveBy.get(`${selected.staffId}|${selected.date}`) : undefined
   const selShift = selected
     ? monthShifts.find(x => x.staff_id === selected.staffId && x.date === selected.date && x.facility_id === selected.facilityId) ?? selLeave
@@ -302,6 +318,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                   {dates.map(d => {
                     const list = cell.get(`${s.id}|${d}`) ?? []
                     const leave = leaveBy.get(`${s.id}|${d}`)
+                    const other = otherBy.get(`${s.id}|${d}`) ?? []
                     const req = reqBy.get(`${s.id}|${d}`) ?? []
                     const warn = list.map(x => flagged.get(x.id)).filter(Boolean).join('\n')
                     const isSel = selected?.staffId === s.id && selected.date === d
@@ -314,12 +331,20 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                         {showFacility ? `${x.facility_id.slice(0, 4)}` : ''}{chipLabel(x)}
                       </span>
                     ))
-                    // 有給は施設に関係なく1つだけ出す
+                    // 休み・有給は施設に関係なく1つだけ出す
                     if (leave) chips.push(
-                      <span key={leave.id} title={`有給（${leave.facility_id}で登録）`}
+                      <span key={leave.id} title={kindLabel(leave.kind, [])}
                         className="block leading-[14px] py-px rounded text-[11px] font-medium text-white"
-                        style={{ background: KIND_COLOR[KIND_PAID] }}>
-                        {KIND_SHORT[KIND_PAID]}
+                        style={{ background: KIND_COLOR[leave.kind] }}>
+                        {KIND_SHORT[leave.kind]}
+                      </span>
+                    )
+                    // 他の施設での勤務は薄く出す（この施設の人数には数えない）
+                    for (const x of other) chips.push(
+                      <span key={x.id} title={`${x.facility_id}で勤務 ${hhmm(x.start_time)}-${hhmm(x.end_time)}`}
+                        className="block leading-[14px] py-px rounded text-[11px] font-medium border bg-white"
+                        style={{ color: KIND_COLOR[x.kind] ?? '#888', borderColor: KIND_COLOR[x.kind] ?? '#888' }}>
+                        {x.facility_id.slice(0, 4)}{chipLabel(x)}
                       </span>
                     )
                     const reqHint = chips.length === 0 && req.length > 0 && (
