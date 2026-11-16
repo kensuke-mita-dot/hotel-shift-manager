@@ -182,6 +182,55 @@ export async function addShift(input: {
   return {}
 }
 
+/**
+ * 月間の表から1マス分のシフトを置き換える（kind = null で外す）。
+ * 1人・1日・1施設につきシフトは1つなので、既存を消してから入れる。
+ */
+export async function setCellShift(input: {
+  facilityId: string
+  date: string
+  staffId: string
+  kind: string | null
+  start?: string
+  end?: string
+}): Promise<{ error?: string }> {
+  const guard = await requireAdmin()
+  if ('error' in guard) return { error: guard.error }
+
+  const supabase = createClient()
+  const { data: existing, error: selErr } = await supabase.from('shifts')
+    .select('id, kind, start_time, end_time')
+    .eq('facility_id', input.facilityId).eq('staff_id', input.staffId).eq('date', input.date)
+  if (selErr) return { error: selErr.message }
+
+  if (input.kind === null) {
+    if (existing?.length) {
+      const { error } = await supabase.from('shifts').delete().in('id', existing.map(e => e.id))
+      if (error) return { error: error.message }
+    }
+    revalidatePath('/admin', 'layout')
+    return {}
+  }
+
+  if (existing?.length) {
+    const { error } = await supabase.from('shifts').delete().in('id', existing.map(e => e.id))
+    if (error) return { error: error.message }
+  }
+  const r = await addShift({
+    facilityId: input.facilityId, date: input.date, staffId: input.staffId,
+    kind: input.kind, start: input.start, end: input.end,
+  })
+  if (r.error && existing?.length) {
+    // 失敗したら元に戻す
+    const e = existing[0]
+    await addShift({
+      facilityId: input.facilityId, date: input.date, staffId: input.staffId,
+      kind: e.kind, start: e.start_time.slice(0, 5), end: e.end_time.slice(0, 5),
+    })
+  }
+  return r
+}
+
 export async function removeShift(shiftId: string): Promise<{ error?: string }> {
   const guard = await requireAdmin()
   if ('error' in guard) return { error: guard.error }
@@ -204,6 +253,10 @@ export interface PublishInfo {
 export interface MonthBoard extends BoardBase {
   month: string   // 'YYYY-MM'
   shifts: BoardShift[]
+  /** 勤務間隔・重複チェック用（前月末日〜翌月1日を含む全施設のシフト） */
+  checkShifts: BoardShift[]
+  /** その月の希望（空いているマスに薄く表示） */
+  requests: BoardRequest[]
   publish: PublishInfo[]
 }
 
@@ -211,7 +264,7 @@ const sig = (s: { staff_id: string; date: string; kind: string; start_time: stri
   `${s.facility_id}|${s.staff_id}|${s.date}|${s.kind}|${s.start_time}|${s.end_time}`
 
 export async function fetchMonthBoard(month: string): Promise<MonthBoard> {
-  const empty: MonthBoard = { month, facilities: [], slots: [], staff: [], shifts: [], publish: [] }
+  const empty: MonthBoard = { month, facilities: [], slots: [], staff: [], shifts: [], checkShifts: [], requests: [], publish: [] }
   const guard = await requireAdmin()
   if ('error' in guard) return { ...empty, error: guard.error }
 
@@ -220,18 +273,20 @@ export async function fetchMonthBoard(month: string): Promise<MonthBoard> {
 
   const { from, to } = monthRange(month)
   const db = createAdminClient()
-  const [shRes, pbRes] = await Promise.all([
+  const [shRes, pbRes, rqRes] = await Promise.all([
     db.from('shifts')
       .select('id, facility_id, staff_id, date, kind, start_time, end_time, starts_at, ends_at, status')
-      .gte('date', from).lte('date', to),
+      .gte('date', addDays(from, -1)).lte('date', addDays(to, 1)),
     db.from('published_shifts')
       .select('facility_id, staff_id, date, kind, start_time, end_time, published_at')
       .gte('date', from).lte('date', to),
+    db.from('shift_requests').select('staff_id, date, type, start_time, end_time').gte('date', from).lte('date', to),
   ])
-  const err = shRes.error ?? pbRes.error
+  const err = shRes.error ?? pbRes.error ?? rqRes.error
   if (err) return { ...empty, error: err.message }
 
-  const shifts = (shRes.data ?? []) as BoardShift[]
+  const checkShifts = (shRes.data ?? []) as BoardShift[]
+  const shifts = checkShifts.filter(s => s.date >= from && s.date <= to)
   const pubs = pbRes.data ?? []
 
   const publish: PublishInfo[] = base.facilities.map(f => {
@@ -245,7 +300,7 @@ export async function fetchMonthBoard(month: string): Promise<MonthBoard> {
     return { facilityId: f.id, publishedAt: last, pendingChanges: diff }
   })
 
-  return { ...base, month, shifts, publish }
+  return { ...base, month, shifts, checkShifts, requests: (rqRes.data ?? []) as BoardRequest[], publish }
 }
 
 // ─── 公開 ─────────────────────────────────────────────────────
