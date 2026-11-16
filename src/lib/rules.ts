@@ -2,6 +2,7 @@
 // シフトの自動チェックロジック
 // 警告のみ。保存は止めない。
 // ============================================================
+import { isWorkKind } from '@/lib/shift-kinds'
 
 /** チェック用のシフト情報 */
 export interface ShiftEntry {
@@ -227,7 +228,7 @@ export function runAllChecks(params: {
   facilityDates: { facilityId: string; date: string }[]
 }): Violation[] {
   // 休み・有給は勤務ではないのでチェックしない
-  params = { ...params, shifts: params.shifts.filter(x => x.kind !== 'off' && x.kind !== 'paid_leave') }
+  params = { ...params, shifts: params.shifts.filter(x => isWorkKind(x.kind)) }
 
   const { shifts, slots, requests, facilityDates } = params
   return [

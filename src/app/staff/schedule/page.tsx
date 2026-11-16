@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import { getSessionUser } from '@/lib/session'
 import { todayJST, monthRange, weekday, WEEK_JA, cn } from '@/lib/utils'
-import { KIND_COLOR, hhmm } from '@/lib/shift-kinds'
+import { KIND_COLOR, hhmm, isWorkKind, kindLabel, KIND_BOTH, KIND_CUSTOM } from '@/lib/shift-kinds'
 import type { FacilitySlot } from '@/types'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -41,18 +41,16 @@ export default async function SchedulePage({
 
   const facilityName = new Map((fRes.data ?? []).map(f => [f.id, f.name]))
   const slots = (slRes.data ?? []) as FacilitySlot[]
-  const isLeave = (kind: string) => kind === 'off' || kind === 'paid_leave'
   const label = (fid: string, kind: string) => {
-    if (kind === 'off') return '休み'
-    if (kind === 'paid_leave') return '有給'
-    if (kind === 'both') return '朝夕（通し）'
-    if (kind === 'custom') return '浮き'
+    if (!isWorkKind(kind)) return kindLabel(kind, [])  // 休み・有給
+    if (kind === KIND_BOTH) return '朝夕（通し）'
+    if (kind === KIND_CUSTOM) return '浮き'
     const s = slots.find(x => x.facility_id === fid && x.key === kind)
     return s ? (s.key === 'base' ? '基本' : `${s.label}勤`) : kind
   }
 
   const shifts = shRes.data ?? []
-  const workDays = new Set(shifts.filter(s => s.kind !== 'off' && s.kind !== 'paid_leave').map(s => s.date)).size
+  const workDays = new Set(shifts.filter(s => isWorkKind(s.kind)).map(s => s.date)).size
 
   return (
     <div className="p-4 space-y-4">
@@ -108,7 +106,7 @@ export default async function SchedulePage({
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-hs-text">
                       {label(s.facility_id, s.kind)}
-                      {!isLeave(s.kind) && <span className="ml-2 text-xs font-normal text-hs-text-sub">{hhmm(s.start_time)}〜{hhmm(s.end_time)}</span>}
+                      {isWorkKind(s.kind) && <span className="ml-2 text-xs font-normal text-hs-text-sub">{hhmm(s.start_time)}〜{hhmm(s.end_time)}</span>}
                     </div>
                     <div className="text-xs text-hs-text-sub truncate">{facilityName.get(s.facility_id) ?? s.facility_id}</div>
                   </div>

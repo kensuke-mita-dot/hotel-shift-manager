@@ -12,6 +12,9 @@ import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays, parseFacilityP
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
+interface RowStats { count: number; total: number; ad: { requested: number; adopted: number } }
+const EMPTY_STATS: RowStats = { count: 0, total: 0, ad: { requested: 0, adopted: 0 } }
+
 function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number)
   const t = new Date(Date.UTC(y, m - 1 + delta, 1))
@@ -40,8 +43,13 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   // 画面上のシフト（保存は1マスずつ。表示は先に反映し、サーバーの最新が届いたら置き換え）
   const [allShifts, setAllShifts] = useState<BoardShift[]>(board.checkShifts)
   useEffect(() => { setAllShifts(board.checkShifts) }, [board.checkShifts])
-  const monthShifts = allShifts.filter(s => s.date >= dates[0] && s.date <= dates[dates.length - 1])
-  const shifts = monthShifts.filter(s => inFacilitySelection(sel, s.facility_id))
+  // 下の集計やマスの表示はこの2つから作る（同じ配列を使い回して、再計算を必要なときだけにする）
+  const monthShifts = useMemo(
+    () => allShifts.filter(s => s.date >= `${month}-01` && s.date <= `${month}-${pad(days)}`),
+    [allShifts, month, days])
+  const shifts = useMemo(
+    () => monthShifts.filter(s => inFacilitySelection(parseFacilityParam(facility), s.facility_id)),
+    [monthShifts, facility])
 
   // 希望（空いているマスに薄く表示）
   const reqBy = useMemo(() => {
@@ -118,6 +126,44 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   const kindRows = boardRows(facilitySlots)
   // 表の下の人数（選んでいる施設ごと）
   const footSlots = sel.flatMap(fid => slotsOf(fid))
+
+  // 表の下の人数：施設|枠|日 → 人数（マスを変えたときだけ数え直す）
+  const coverCount = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const slot of footSlots) {
+      for (const x of shifts) {
+        if (x.facility_id !== slot.facility_id || !coversSlot(x, slot.key)) continue
+        const k = `${slot.facility_id}|${slot.key}|${x.date}`
+        map.set(k, (map.get(k) ?? 0) + 1)
+      }
+    }
+    return map
+    // footSlots は facility と board.slots から決まる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shifts, facility, board.slots])
+
+  // 右端の集計（人ごと）：日数（選んでいる施設）・全施設の合計・希望の採用
+  const statsBy = useMemo(() => {
+    const shiftsBy = new Map<string, BoardShift[]>()
+    for (const x of monthShifts) shiftsBy.set(x.staff_id, [...(shiftsBy.get(x.staff_id) ?? []), x])
+    const reqsBy = new Map<string, MonthBoard['requests']>()
+    for (const r of board.requests) reqsBy.set(r.staff_id, [...(reqsBy.get(r.staff_id) ?? []), r])
+    const map = new Map<string, RowStats>()
+    shiftsBy.forEach((mine, staffId) => {
+      const work = mine.filter(x => isWorkKind(x.kind))
+      map.set(staffId, {
+        count: new Set(work.filter(x => inFacilitySelection(sel, x.facility_id)).map(x => x.date)).size,
+        total: new Set(work.map(x => x.date)).size,
+        ad: adoptionStats(reqsBy.get(staffId) ?? [], mine),
+      })
+    })
+    reqsBy.forEach((reqs, staffId) => {
+      if (!map.has(staffId)) map.set(staffId, { count: 0, total: 0, ad: adoptionStats(reqs, []) })
+    })
+    return map
+    // sel は facility から決まる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthShifts, board.requests, facility])
 
   /** マスを押したときの入力先の施設：その日に入っている施設 → 主な所属 → 所属 → 選択の先頭 */
   const facilityForCell = (staffId: string, date: string): string => {
@@ -293,11 +339,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
           </thead>
           <tbody>
             {rows.map((s, i) => {
-              const count = new Set(shifts.filter(x => x.staff_id === s.id && isWorkKind(x.kind)).map(x => x.date)).size
-              // 兼任の人は全施設の合計も出す（採用率も全施設で数える）
-              const mine = monthShifts.filter(x => x.staff_id === s.id)
-              const total = new Set(mine.filter(x => isWorkKind(x.kind)).map(x => x.date)).size
-              const ad = adoptionStats(board.requests.filter(r => r.staff_id === s.id), mine)
+              const { count, total, ad } = statsBy.get(s.id) ?? EMPTY_STATS
               const rate = ad.requested > 0 ? Math.round((ad.adopted / ad.requested) * 100) : null
               const group = mainFacility(s)
               const newGroup = i === 0 || mainFacility(rows[i - 1]) !== group
@@ -400,7 +442,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                     {slot.key === 'base' ? '基本' : slot.label}の人数
                   </td>
                   {dates.map(d => {
-                    const n = shifts.filter(x => x.facility_id === slot.facility_id && x.date === d && coversSlot(x, slot.key)).length
+                    const n = coverCount.get(`${slot.facility_id}|${slot.key}|${d}`) ?? 0
                     const short = n < slot.min_staff
                     return (
                       <td key={d} className={cn('px-0.5 py-1 border-t border-l border-hs-border text-center tabular-nums',

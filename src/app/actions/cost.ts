@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth-guard'
 import { monthRange } from '@/lib/utils'
-import { workMinutes } from '@/lib/shift-kinds'
+import { workMinutes, isWorkKind, KIND_OFF, KIND_PAID } from '@/lib/shift-kinds'
 import { wageAt, PAID_LEAVE_HOURS } from '@/lib/pay'
 
 /** 深夜割増率（労基法の下限 25%） */
@@ -86,14 +86,14 @@ export async function fetchCost(month: string): Promise<CostData> {
 
   for (const s of shRes.data ?? []) {
     // 休み：給与なし
-    if (s.kind === 'off') continue
+    if (s.kind === KIND_OFF) continue
     const r = rowFor(s.staff_id)
     const wage = wageAt(r.hourlyWage, s.facility_id)
     const bf = r.byFacility[s.facility_id] ?? { shifts: 0, minutes: 0, pay: 0, transport: 0 }
     r.byFacility[s.facility_id] = bf
 
     // 有給：所定時間×時給（同じ日に複数あっても1日分）。交通費なし
-    if (s.kind === 'paid_leave') {
+    if (s.kind === KIND_PAID) {
       if (r._leave.has(s.date)) continue
       r._leave.add(s.date)
       const pay = wage * PAID_LEAVE_HOURS
@@ -149,7 +149,7 @@ export async function fetchCost(month: string): Promise<CostData> {
     transport: rows.reduce((a, r) => a + r.transport, 0),
     total: rows.reduce((a, r) => a + r.total, 0),
     minutes: rows.reduce((a, r) => a + r.minutes, 0),
-    shifts: (shRes.data ?? []).filter(x => x.kind !== 'off' && x.kind !== 'paid_leave').length,
+    shifts: (shRes.data ?? []).filter(x => isWorkKind(x.kind)).length,
   }
 
   return {
