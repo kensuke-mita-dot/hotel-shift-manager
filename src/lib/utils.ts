@@ -69,6 +69,23 @@ export function compareByLoginId(
   return a.fullName.localeCompare(b.fullName, 'ja')
 }
 
+/** 同じ施設内の並び：管理者を先頭に、その後ろにスタッフをログインID順 */
+export function compareStaffInFacility(
+  a: { isAdmin: boolean; loginId: string | null; fullName: string },
+  b: { isAdmin: boolean; loginId: string | null; fullName: string },
+): number {
+  if (a.isAdmin !== b.isAdmin) return a.isAdmin ? -1 : 1
+  return compareByLoginId(a, b)
+}
+
+/** 所属施設を短く表示（主な所属＋ほかの数。例：「BHJ ほか4」） */
+export function facilitySummary(s: { primaryFacilityId: string | null; facilityIds: string[] }): string {
+  const main = s.primaryFacilityId ?? s.facilityIds[0]
+  if (!main) return '施設未設定'
+  const others = s.facilityIds.length - 1
+  return others > 0 ? `${main} ほか${others}` : main
+}
+
 /** 主な所属（なければ最初の所属） */
 export function mainFacility(s: { primaryFacilityId: string | null; facilityIds: string[] }): string | null {
   return s.primaryFacilityId ?? s.facilityIds[0] ?? null
