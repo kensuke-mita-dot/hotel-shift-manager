@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Send, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { publishMonth, setCellShift, type MonthBoard, type BoardShift } from '@/app/actions/board'
 import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, KIND_OFF, KIND_PAID, hhmm, boardRows, bothTimes, isWorkKind, kindLabel } from '@/lib/shift-kinds'
-import { requestText } from '@/lib/requests'
+import { requestText, adoptionStats } from '@/lib/requests'
 import { coversSlot, runAllChecks } from '@/lib/rules'
 import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays } from '@/lib/utils'
 
@@ -207,18 +207,25 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                 )
               })}
               <th className="sticky top-0 z-20 bg-hs-gray-lighter px-2 py-2 font-medium text-hs-text-sub border-b border-l border-hs-border">日数</th>
+              <th className="sticky top-0 z-20 bg-hs-gray-lighter px-2 py-2 font-medium text-hs-text-sub border-b border-l border-hs-border"
+                title="勤務の希望（×・有給以外）を出した日のうち、どこかの施設で勤務が入った日の割合">採用</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((s, i) => {
               const count = new Set(shifts.filter(x => x.staff_id === s.id && isWorkKind(x.kind)).map(x => x.date)).size
+              // 兼任の人は全施設の合計も出す（採用率も全施設で数える）
+              const mine = monthShifts.filter(x => x.staff_id === s.id)
+              const total = new Set(mine.filter(x => isWorkKind(x.kind)).map(x => x.date)).size
+              const ad = adoptionStats(board.requests.filter(r => r.staff_id === s.id), mine)
+              const rate = ad.requested > 0 ? Math.round((ad.adopted / ad.requested) * 100) : null
               const group = mainFacility(s)
               const newGroup = i === 0 || mainFacility(rows[i - 1]) !== group
               return (
                 <Fragment key={s.id}>
                 {newGroup && (
                   <tr>
-                    <td colSpan={dates.length + 2} className="bg-hs-gray-light px-3 py-1 text-[11px] font-semibold text-hs-text-sub border-b border-hs-border">
+                    <td colSpan={dates.length + 3} className="bg-hs-gray-light px-3 py-1 text-[11px] font-semibold text-hs-text-sub border-b border-hs-border">
                       <span className="sticky left-3">{group ? `${group}　${facilityName.get(group) ?? ''}` : '所属未設定'}</span>
                     </td>
                   </tr>
@@ -265,13 +272,21 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                       </td>
                     )
                   })}
-                  <td className="px-2 py-1.5 border-b border-l border-hs-border text-center tabular-nums text-hs-text">{count}</td>
+                  <td className="px-2 py-1.5 border-b border-l border-hs-border text-center tabular-nums text-hs-text whitespace-nowrap">
+                    {count}
+                    {!isAll && total !== count && <span className="ml-0.5 text-[10px] text-hs-text-lighter">（計{total}）</span>}
+                  </td>
+                  <td className={cn('px-2 py-1.5 border-b border-l border-hs-border text-center tabular-nums whitespace-nowrap',
+                      rate === null ? 'text-hs-text-lighter' : rate < 50 ? 'text-hs-warn font-semibold' : 'text-hs-text')}
+                    title={rate === null ? '勤務の希望がありません' : `希望${ad.requested}日のうち${ad.adopted}日採用（全施設）`}>
+                    {rate === null ? '希望なし' : <>{ad.adopted}/{ad.requested}<span className="ml-0.5 text-[10px]">（{rate}%）</span></>}
+                  </td>
                 </tr>
                 </Fragment>
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={dates.length + 2} className="px-4 py-8 text-center text-hs-text-lighter">
+              <tr><td colSpan={dates.length + 3} className="px-4 py-8 text-center text-hs-text-lighter">
                 対象のスタッフがいません。<Link href="/admin/staff" className="underline">スタッフ</Link>で所属施設を設定してください。
               </td></tr>
             )}
@@ -291,6 +306,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                         short ? 'bg-hs-danger-bg text-hs-danger font-semibold' : 'text-hs-text-sub')}>{n}</td>
                     )
                   })}
+                  <td className="border-t border-l border-hs-border" />
                   <td className="border-t border-l border-hs-border" />
                 </tr>
               ))}

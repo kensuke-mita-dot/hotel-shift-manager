@@ -83,3 +83,19 @@ export function validateDayRequests(list: RequestItem[]): string | null {
   }
   return null
 }
+
+/**
+ * 希望の採用状況（1人分・1か月分）。
+ * 「勤務の希望（×・有給以外）を出した日」のうち、どこかの施設で勤務が入った日を採用とする。
+ * 朝希望で夕に入った場合も採用に数える。
+ */
+export function adoptionStats(
+  requests: { date: string; type: RequestType }[],
+  shifts: { date: string; kind: string }[],
+): { requested: number; adopted: number } {
+  const wanted = new Set(requests.filter(r => !EXCLUSIVE_REQUESTS.includes(r.type)).map(r => r.date))
+  const worked = new Set(shifts.filter(s => s.kind !== 'off' && s.kind !== 'paid_leave').map(s => s.date))
+  let adopted = 0
+  wanted.forEach(d => { if (worked.has(d)) adopted++ })
+  return { requested: wanted.size, adopted }
+}
