@@ -1,14 +1,15 @@
 'use client'
 
-import { Fragment, useMemo, useTransition } from 'react'
+import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Send, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Send, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { publishMonth, type MonthBoard, type BoardShift } from '@/app/actions/board'
-import { KIND_SHORT, KIND_COLOR, hhmm } from '@/lib/shift-kinds'
-import { coversSlot } from '@/lib/rules'
-import { monthRange, weekday, WEEK_JA, cn, mainFacility } from '@/lib/utils'
+import { publishMonth, setCellShift, type MonthBoard, type BoardShift } from '@/app/actions/board'
+import { KIND_SHORT, KIND_COLOR, KIND_CUSTOM, hhmm, boardRows, bothTimes } from '@/lib/shift-kinds'
+import { requestText } from '@/lib/requests'
+import { coversSlot, runAllChecks } from '@/lib/rules'
+import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays } from '@/lib/utils'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -32,7 +33,40 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   const dates = Array.from({ length: days }, (_, i) => `${month}-${pad(i + 1)}`)
 
   const isAll = facility === 'all'
-  const shifts = isAll ? board.shifts : board.shifts.filter(s => s.facility_id === facility)
+  // 施設を選んでいるときは、表のマスから直接シフトを入れられる
+  const editable = !isAll
+
+  // 画面上のシフト（保存は1マスずつ。表示は先に反映し、サーバーの最新が届いたら置き換え）
+  const [allShifts, setAllShifts] = useState<BoardShift[]>(board.checkShifts)
+  useEffect(() => { setAllShifts(board.checkShifts) }, [board.checkShifts])
+  const monthShifts = allShifts.filter(s => s.date >= dates[0] && s.date <= dates[dates.length - 1])
+  const shifts = isAll ? monthShifts : monthShifts.filter(s => s.facility_id === facility)
+
+  // 希望（空いているマスに薄く表示）
+  const reqBy = useMemo(() => {
+    const m = new Map<string, MonthBoard['requests']>()
+    for (const r of board.requests) {
+      const k = `${r.staff_id}|${r.date}`
+      m.set(k, [...(m.get(k) ?? []), r])
+    }
+    return m
+  }, [board.requests])
+
+  // 勤務間隔8時間未満・施設間の時間かぶり（赤枠で表示）
+  const flagged = useMemo(() => {
+    const vs = runAllChecks({ shifts: allShifts, slots: board.slots, requests: [], facilityDates: [] })
+    const m = new Map<string, string>()
+    for (const v of vs) {
+      if (v.type !== 'interval' && v.type !== 'overlap') continue
+      for (const id of v.shiftIds) m.set(id, m.has(id) ? `${m.get(id)}\n${v.message}` : v.message)
+    }
+    return m
+  }, [allShifts, board.slots])
+
+  // 入力パネル
+  const [selected, setSelected] = useState<{ staffId: string; date: string } | null>(null)
+  const [floatStart, setFloatStart] = useState('10:00')
+  const [floatEnd, setFloatEnd] = useState('15:00')
 
   // 行：シフト対象の人のうち、この施設の所属か、この月にこの施設で入っている人
   const withShift = new Set(shifts.map(s => s.staff_id))
@@ -49,6 +83,58 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   }, [shifts])
 
   const facilitySlots = isAll ? [] : board.slots.filter(s => s.facility_id === facility).sort((a, b) => a.sort - b.sort)
+  const kindRows = boardRows(facilitySlots)
+
+  const nameBy = useMemo(() => new Map(board.staff.map(s => [s.id, s.fullName])), [board.staff])
+
+  const goNext = (cell: { staffId: string; date: string }) => {
+    const idx = dates.indexOf(cell.date)
+    setSelected(idx >= 0 && idx < dates.length - 1 ? { staffId: cell.staffId, date: dates[idx + 1] } : null)
+  }
+
+  /** 1マス分を保存して次の日へ（kind = null で外す） */
+  const saveCell = (cell: { staffId: string; date: string }, kind: string | null) => {
+    if (!editable) return
+    let startT = '', endT = ''
+    if (kind === KIND_CUSTOM) {
+      if (floatStart === floatEnd) { toast.error('浮きの開始と終了が同じです'); return }
+      startT = floatStart; endT = floatEnd
+    } else if (kind === 'both') {
+      const t = bothTimes(facilitySlots); if (!t) return
+      startT = hhmm(t.start); endT = hhmm(t.end)
+    } else if (kind) {
+      const sl = facilitySlots.find(x => x.key === kind); if (!sl) return
+      startT = hhmm(sl.start_time); endT = hhmm(sl.end_time)
+    }
+
+    const before = allShifts
+    const others = allShifts.filter(x => !(x.staff_id === cell.staffId && x.date === cell.date && x.facility_id === facility))
+    const next = kind === null ? others : [...others, {
+      id: `tmp-${cell.staffId}-${cell.date}`, facility_id: facility, staff_id: cell.staffId, date: cell.date, kind,
+      start_time: `${startT}:00`, end_time: `${endT}:00`,
+      starts_at: `${cell.date}T${startT}:00`,
+      ends_at: `${endT <= startT ? addDays(cell.date, 1) : cell.date}T${endT}:00`,
+      status: 'draft' as const,
+    }]
+    setAllShifts(next)
+    goNext(cell)
+
+    start(async () => {
+      const r = await setCellShift({
+        facilityId: facility, date: cell.date, staffId: cell.staffId, kind,
+        ...(kind === KIND_CUSTOM ? { start: startT, end: endT } : {}),
+      })
+      if (r.error) { toast.error(r.error); setAllShifts(before); return }
+      router.refresh()
+    })
+  }
+
+  const selShift = selected ? shifts.find(x => x.staff_id === selected.staffId && x.date === selected.date) : undefined
+  const selReq = selected ? reqBy.get(`${selected.staffId}|${selected.date}`) ?? [] : []
+  const selElsewhere = selected
+    ? monthShifts.filter(x => x.staff_id === selected.staffId && x.date === selected.date && x.facility_id !== facility)
+    : []
+
   const targets = isAll ? board.facilities.map(f => f.id) : [facility]
   const publishRows = board.publish.filter(p => targets.includes(p.facilityId))
   const pendingTotal = publishRows.reduce((a, p) => a + p.pendingChanges, 0)
@@ -65,7 +151,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
   }
 
   return (
-    <div className="px-4 py-4 md:px-10 md:py-6 space-y-4">
+    <div className={cn('px-4 py-4 md:px-10 md:py-6 space-y-4', editable && 'pb-48')}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-1">
           <Link href={`/admin/monthly?facility=${facility}&month=${shiftMonth(month, -1)}`}
@@ -145,18 +231,38 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                   </td>
                   {dates.map(d => {
                     const list = cell.get(`${s.id}|${d}`) ?? []
+                    const req = reqBy.get(`${s.id}|${d}`) ?? []
+                    const warn = list.map(x => flagged.get(x.id)).filter(Boolean).join('\n')
+                    const isSel = selected?.staffId === s.id && selected.date === d
+                    const chips = list.map(x => (
+                      <span key={x.id} title={`${x.facility_id} ${hhmm(x.start_time)}-${hhmm(x.end_time)}`}
+                        className="block leading-[14px] py-px rounded text-[11px] font-medium text-white"
+                        style={{ background: KIND_COLOR[x.kind] ?? '#888' }}>
+                        {isAll ? `${x.facility_id.slice(0, 4)}` : ''}{KIND_SHORT[x.kind] ?? x.kind}
+                      </span>
+                    ))
+                    const reqHint = list.length === 0 && req.length > 0 && (
+                      <span className={cn('block text-[10px] leading-[14px]',
+                        req.some(r => r.type === 'off') ? 'text-hs-danger/50' : 'text-hs-text-lighter')}>
+                        {requestText(req, { withTime: false })}
+                      </span>
+                    )
+                    const cls = cn('block w-full min-h-[28px] rounded',
+                      warn ? 'ring-2 ring-hs-danger' : 'hover:ring-1 hover:ring-hs-blue-border',
+                      isSel && 'ring-2 ring-hs-blue')
+                    const title = [req.length ? `希望：${requestText(req)}` : '', warn].filter(Boolean).join('\n') || undefined
                     return (
                       <td key={d} className="p-0.5 border-b border-l border-hs-border text-center align-middle">
-                        <Link href={`/admin/daily?facility=${isAll && list[0] ? list[0].facility_id : facility}&date=${d}`}
-                          className="block min-h-[28px] rounded hover:ring-1 hover:ring-hs-blue-border">
-                          {list.map(x => (
-                            <span key={x.id} title={`${x.facility_id} ${hhmm(x.start_time)}-${hhmm(x.end_time)}`}
-                              className="block leading-[14px] py-px rounded text-[11px] font-medium text-white"
-                              style={{ background: KIND_COLOR[x.kind] ?? '#888' }}>
-                              {isAll ? `${x.facility_id.slice(0, 4)}` : ''}{KIND_SHORT[x.kind] ?? x.kind}
-                            </span>
-                          ))}
-                        </Link>
+                        {editable ? (
+                          <button onClick={() => setSelected({ staffId: s.id, date: d })} className={cls} title={title}>
+                            {chips}{reqHint}
+                          </button>
+                        ) : (
+                          <Link href={`/admin/daily?facility=${list[0] ? list[0].facility_id : facility}&date=${d}`}
+                            className={cls} title={title}>
+                            {chips}{reqHint}
+                          </Link>
+                        )}
                       </td>
                     )
                   })}
@@ -201,8 +307,61 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
             {KIND_SHORT[k]}={{ morning: '朝勤', evening: '夕勤', both: '朝夕通し', night: '夜勤', base: '基本', custom: '浮き' }[k]}
           </span>
         ))}
-        日付やマスを押すと、その日の日次調整を開きます。
+        {editable
+          ? 'マスを押すと、画面下からシフトを入れられます。薄い文字は本人の希望、赤枠は勤務間隔8時間未満などの注意です。日付を押すとその日の日次調整を開きます。'
+          : '施設を選ぶと、表のマスから直接シフトを入れられます。日付やマスを押すと、その日の日次調整を開きます。'}
       </p>
+
+      {/* 入力パネル（画面下に固定） */}
+      {editable && selected && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-hs-border shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="text-sm font-medium text-hs-text">
+                {nameBy.get(selected.staffId)}　{Number(selected.date.slice(5, 7))}/{Number(selected.date.slice(8))}（{WEEK_JA[weekday(selected.date)]}）{facility}
+              </span>
+              <span className="text-xs text-hs-text-sub">
+                今：{selShift ? `${KIND_SHORT[selShift.kind] ?? selShift.kind} ${hhmm(selShift.start_time)}-${hhmm(selShift.end_time)}` : 'なし'}
+                {selReq.length > 0 && <>　希望：{requestText(selReq)}</>}
+                {selElsewhere.length > 0 && <span className="text-hs-warn">　{selElsewhere.map(x => `${x.facility_id}${KIND_SHORT[x.kind] ?? ''}`).join('・')}に配置済</span>}
+              </span>
+              {pending && <Loader2 className="w-4 h-4 animate-spin text-hs-text-lighter" />}
+              <button onClick={() => setSelected(null)} className="ml-auto h-8 w-8 inline-flex items-center justify-center rounded hover:bg-hs-gray-lighter" aria-label="閉じる">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {kindRows.filter(r => r.kind !== KIND_CUSTOM).map(r => (
+                <button key={r.kind} onClick={() => saveCell(selected, r.kind)}
+                  className={cn('h-10 min-w-[64px] px-3 rounded-btn text-sm font-medium text-white',
+                    selShift?.kind === r.kind && 'ring-2 ring-offset-1 ring-hs-blue')}
+                  style={{ background: KIND_COLOR[r.kind] ?? '#888' }}
+                  title={r.start && r.end ? `${hhmm(r.start)}〜${hhmm(r.end)}` : undefined}>
+                  {r.label.replace('（通し）', '')}
+                  {r.start && r.end && <span className="ml-1 text-[10px] font-normal opacity-90">{hhmm(r.start)}-{hhmm(r.end)}</span>}
+                </button>
+              ))}
+              <span className="inline-flex items-center gap-1 pl-2 border-l border-hs-border">
+                <input type="time" value={floatStart} onChange={e => setFloatStart(e.target.value)} step={900}
+                  className="h-10 px-2 rounded-btn border border-hs-input-border text-base md:text-sm" aria-label="浮きの開始" />
+                <span className="text-hs-text-sub">〜</span>
+                <input type="time" value={floatEnd} onChange={e => setFloatEnd(e.target.value)} step={900}
+                  className="h-10 px-2 rounded-btn border border-hs-input-border text-base md:text-sm" aria-label="浮きの終了" />
+                <button onClick={() => saveCell(selected, KIND_CUSTOM)}
+                  className={cn('h-10 px-3 rounded-btn text-sm font-medium text-white', selShift?.kind === KIND_CUSTOM && 'ring-2 ring-offset-1 ring-hs-blue')}
+                  style={{ background: KIND_COLOR.custom }}>
+                  浮き
+                </button>
+              </span>
+              <button onClick={() => saveCell(selected, null)} disabled={!selShift}
+                className="h-10 px-3 rounded-btn text-sm text-hs-text-sub border border-hs-border bg-white ml-auto disabled:opacity-40">
+                外す
+              </button>
+            </div>
+            <p className="text-[11px] text-hs-text-lighter mt-2">押すとすぐ保存して次の日へ進みます（下書き。スタッフに見えるのは「公開」後）。</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
