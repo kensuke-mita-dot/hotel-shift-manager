@@ -12,8 +12,8 @@ const LATE_NIGHT_PREMIUM = 0.25
 export interface CostRow {
   staffId: string
   fullName: string
-  /** 個別に設定された時給（0 なら施設の初期値で計算） */
-  hourlyWage: number
+  /** 個別に設定された時給（null なら施設の初期値で計算。0 は 0円） */
+  hourlyWage: number | null
   usesDefaultWage: boolean
   transportType: 'per_shift' | 'monthly'
   transportAmount: number
@@ -71,8 +71,8 @@ export async function fetchCost(month: string): Promise<CostData> {
       r = {
         staffId,
         fullName: names.get(staffId) ?? '（削除済み）',
-        hourlyWage: p?.hourly_wage ?? 0,
-        usesDefaultWage: !(p?.hourly_wage && p.hourly_wage > 0),
+        hourlyWage: p?.hourly_wage ?? null,
+        usesDefaultWage: p?.hourly_wage === null || p?.hourly_wage === undefined,
         transportType: (p?.transport_type ?? 'per_shift') as CostRow['transportType'],
         transportAmount: p?.transport_amount ?? 0,
         byFacility: {}, days: 0, paidLeaveDays: 0, paidLeavePay: 0,

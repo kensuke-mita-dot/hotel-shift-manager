@@ -22,7 +22,7 @@ export function defaultWage(facilityId: string | null | undefined): number {
   return (facilityId && FACILITY_DEFAULT_WAGE[facilityId]) || 0
 }
 
-/** その施設での時給：個別設定があればそれ、なければ施設の初期値 */
+/** その施設での時給：個別設定（0円を含む）があればそれ、未設定（null）なら施設の初期値 */
 export function wageAt(staffWage: number | null | undefined, facilityId: string): number {
-  return staffWage && staffWage > 0 ? staffWage : defaultWage(facilityId)
+  return staffWage === null || staffWage === undefined ? defaultWage(facilityId) : staffWage
 }
