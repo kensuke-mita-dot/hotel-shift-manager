@@ -15,13 +15,20 @@ dot Inc. の5施設（BHJ・MAHT・BHKK・MAHNM・MAHB）向けのシフト管�
 | 画面 | パス | 内容 |
 |---|---|---|
 | 日次調整 | `/admin/daily` | 1日分を施設×枠で配置。勤務間隔・重複・欠員をチェック |
-| 月間 | `/admin/monthly` | 1か月をスタッフ×日の表で入力（朝・夕・朝夕通し・夜・浮き・休み・有給）。施設ごとに公開 |
+| 月間 | `/admin/monthly` | 1か月をスタッフ×日の表で入力（朝・夕・朝夕通し・夜・浮き・休み・有給）。日数・希望の採用率。施設ごとに公開 |
 | 希望 | `/admin/requests` | スタッフの希望一覧と代理入力 |
 | 人件費 | `/admin/cost` | 下書きを含むシフト × 時給・交通費の見込み |
 | スタッフ | `/admin/staff` | 追加（ID＋PIN発行）・氏名/所属/時給/交通費の編集・PIN再発行・提出期限の延長・停止 |
 | 確定シフト | `/staff/schedule` | 公開済みの自分のシフト |
 | 希望入力 | `/staff/requests` | 来月から3か月分の希望を提出 |
 | PIN変更 | `/staff/pin` | 初回ログイン時は必ずここへ誘導 |
+
+施設の切り替え（日次・月間・希望）は複数選べる。URL は `?facility=BHJ,MAHT`、`all` は全施設。
+
+シフトの決まりごと：
+- 1人・1日・1施設につきシフトは1つ。朝と夕の両方なら「朝夕（通し）」。
+- 休み・有給は「人×日」で1つ。どこかの施設で入れると、他の施設の休み・有給は外れる。表ではどの施設でも施設名なしで出る。
+- 浮きは時間を指定する勤務。「夕勤として数える」などを指定したときだけ、その枠の人数（欠員チェック）に数える（`shifts.covers_slot`）。
 
 ログイン：スタッフは **ログインID＋6桁PIN**（内部的には `<ID>@staff.hotel-shift.invalid` のメールとして Supabase Auth に登録）、管理者は **メール＋パスワード**。
 
@@ -70,7 +77,7 @@ design_handoff_hotel_shift/  初期の設計資料・プロトタイプ（参照
 
 ## DB（Supabase）
 
-`supabase/migrations/` を番号順に Supabase の SQL Editor で実行する。本番には 009 まで適用済み。
+`supabase/migrations/` を番号順に Supabase の SQL Editor で実行する。本番には 010 まで適用済み。
 
 | ファイル | 内容 |
 |---|---|
@@ -82,6 +89,7 @@ design_handoff_hotel_shift/  初期の設計資料・プロトタイプ（参照
 | 007_two_time_ranges | 時間指定の希望を1日2つまで |
 | 008_paid_leave | 有給（シフト・希望） |
 | 009_wage_nullable | 時給の未設定（null＝施設の初期時給）と 0円 の区別 |
+| 010_float_covers_slot | 浮きを人数に数える枠（`covers_slot`）、重複していた有給の整理 |
 
 DBを変える変更を入れるときは、新しい番号のファイルを追加し、本番で実行してからアプリをデプロイする。
 
@@ -114,4 +122,5 @@ npm run build
 - **画面に赤いエラー**：多くは DB の列や関数が足りない（マイグレーション未適用）。メッセージに `column ... does not exist` などがあれば該当の SQL を実行する。
 - **本番だけおかしい**：Vercel のダッシュボード → `dot-hotel-shift` → Logs でサーバーのエラーを確認。
 - **ログインできない**：Supabase → Authentication → Users でユーザーがいるか、`profiles.is_active` が true か。スタッフのPINは管理画面の「PIN再発行」で作り直せる。
+- **main に入れたのに本番が変わらない**：まれに Vercel が自動で拾わないことがある。Vercel → Deployments で最新の main を「Redeploy」する。
 - **前の状態に戻したい**：Vercel → Deployments で前のデプロイを「Promote to Production」（DBは戻らないので注意）。

@@ -8,7 +8,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { addDays, monthRange, facilityRank, mainFacility, compareStaffInFacility } from '@/lib/utils'
 import { KIND_BOTH, KIND_CUSTOM, LEAVE_KINDS, bothTimes } from '@/lib/shift-kinds'
 import type { Facility, FacilitySlot, RequestType } from '@/types'
-import { validateDayRequests } from '@/lib/requests'
+import { validateDayRequests, REQUEST_ORDER } from '@/lib/requests'
 
 export interface BoardStaff {
   id: string
@@ -137,12 +137,13 @@ export async function addShift(input: {
   /** 浮きのとき：人数に数える枠（'morning' | 'evening' など。null・未指定なら数えない） */
   coversSlot?: string | null
 }): Promise<{ error?: string }> {
-  const guard = await requireAdmin()
-  if ('error' in guard) return { error: guard.error }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { error: '日付が不正です' }
-
-  const db = createAdminClient()
-  const { data: slots } = await db.from('facility_slots').select('*').eq('facility_id', input.facilityId)
+  // 権限確認と枠の読み込みを同時に行う
+  const [guard, { data: slots }] = await Promise.all([
+    requireAdmin(),
+    createAdminClient().from('facility_slots').select('*').eq('facility_id', input.facilityId),
+  ])
+  if ('error' in guard) return { error: guard.error }
   const fs = (slots ?? []) as FacilitySlot[]
 
   let start: string, end: string
@@ -369,8 +370,6 @@ export async function fetchRequestBoard(month: string): Promise<RequestBoard> {
   return { ...base, month, requests: (rqRes.data ?? []) as BoardRequest[], submissions: sbRes.data ?? [] }
 }
 
-const REQUEST_TYPES: RequestType[] = ['morning', 'evening', 'both', 'night', 'off', 'custom']
-
 /** 管理者がスタッフの1日分の希望をまとめて置き換える（空配列で削除）。提出期限に関係なく書ける */
 export async function setDayRequestsAsAdmin(input: {
   staffId: string
@@ -388,7 +387,7 @@ export async function setDayRequestsAsAdmin(input: {
     start_time: i.type === 'custom' ? i.start ?? null : null,
     end_time:   i.type === 'custom' ? i.end ?? null : null,
   }))
-  if (rows.some(r => !REQUEST_TYPES.includes(r.type))) return { error: '希望の種類が不正です' }
+  if (rows.some(r => !REQUEST_ORDER.includes(r.type))) return { error: '希望の種類が不正です' }
   if (rows.some(r => r.type === 'custom' && (!TIME.test(r.start_time ?? '') || !TIME.test(r.end_time ?? '')))) {
     return { error: '時間指定は開始と終了の時刻を入れてください' }
   }

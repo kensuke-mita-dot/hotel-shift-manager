@@ -3,6 +3,7 @@
 // 時間指定は1日に2つまで（例：08:00-13:00 と 14:30-22:00）。
 // 「休」はほかの希望と同時に指定できない。
 import { REQUEST_LABEL } from '@/types'
+import { isWorkKind } from '@/lib/shift-kinds'
 import type { RequestType } from '@/types'
 
 export interface RequestItem {
@@ -94,7 +95,7 @@ export function adoptionStats(
   shifts: { date: string; kind: string }[],
 ): { requested: number; adopted: number } {
   const wanted = new Set(requests.filter(r => !EXCLUSIVE_REQUESTS.includes(r.type)).map(r => r.date))
-  const worked = new Set(shifts.filter(s => s.kind !== 'off' && s.kind !== 'paid_leave').map(s => s.date))
+  const worked = new Set(shifts.filter(s => isWorkKind(s.kind)).map(s => s.date))
   let adopted = 0
   wanted.forEach(d => { if (worked.has(d)) adopted++ })
   return { requested: wanted.size, adopted }
