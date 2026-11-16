@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { addShift, removeShift, type DayBoard, type BoardShift, type BoardStaff } from '@/app/actions/board'
 import { boardRows, kindLabel, hhmm, KIND_COLOR, KIND_CUSTOM, type BoardRow } from '@/lib/shift-kinds'
 import { runAllChecks, coversSlot, type Violation } from '@/lib/rules'
-import { addDays, weekday, WEEK_JA, cn } from '@/lib/utils'
+import { addDays, weekday, WEEK_JA, cn, facilitySummary } from '@/lib/utils'
 import { requestText } from '@/lib/requests'
 import type { Facility, FacilitySlot } from '@/types'
 
@@ -101,12 +101,16 @@ export function DailyClient({ board, facility }: { board: DayBoard; facility: st
               const r = requestBy.get(s.id)
               return (
                 <li key={s.id} className="px-4 py-2 flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate text-hs-text">
+                  {/* 名前は必ず見えるように縮めない。右側の情報は長ければ省略（全文はマウスを乗せると表示） */}
+                  <span className="shrink-0 text-hs-text whitespace-nowrap">
                     {s.fullName}
                     {s.isAdmin && <span className="ml-1 text-[10px] text-hs-text-lighter">管理者</span>}
                   </span>
-                  <span className="text-xs text-hs-text-sub whitespace-nowrap">
-                    {r?.length ? `希望：${requestText(r)}` : s.facilityIds.join('・') || '施設未設定'}
+                  <span
+                    className="min-w-0 truncate text-right text-xs text-hs-text-sub"
+                    title={r?.length ? `希望：${requestText(r)}` : s.facilityIds.join('・') || '施設未設定'}
+                  >
+                    {r?.length ? `希望：${requestText(r)}` : facilitySummary(s)}
                   </span>
                 </li>
               )
