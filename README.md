@@ -77,7 +77,7 @@ design_handoff_hotel_shift/  初期の設計資料・プロトタイプ（参照
 
 ## DB（Supabase）
 
-`supabase/migrations/` を番号順に Supabase の SQL Editor で実行する。本番には 010 まで適用済み。
+`supabase/migrations/` を番号順に Supabase の SQL Editor で実行する。本番には 011 まで適用済み。
 
 | ファイル | 内容 |
 |---|---|
@@ -90,6 +90,7 @@ design_handoff_hotel_shift/  初期の設計資料・プロトタイプ（参照
 | 008_paid_leave | 有給（シフト・希望） |
 | 009_wage_nullable | 時給の未設定（null＝施設の初期時給）と 0円 の区別 |
 | 010_float_covers_slot | 浮きを人数に数える枠（`covers_slot`）、重複していた有給の整理 |
+| 011_fix_publish_shifts | 公開（publish_shifts）が「staff_id is ambiguous」で失敗する不具合の修正 |
 
 DBを変える変更を入れるときは、新しい番号のファイルを追加し、本番で実行してからアプリをデプロイする。
 
