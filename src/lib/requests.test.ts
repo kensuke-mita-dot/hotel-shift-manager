@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateDayRequests, normalizeRequests, requestText, adoptionStats } from './requests'
+import { validateDayRequests, normalizeRequests, requestText, adoptionStats, requestOutcome } from './requests'
 
 const c = (s: string, e: string) => ({ type: 'custom' as const, start_time: s, end_time: e })
 
@@ -40,5 +40,25 @@ describe('希望の採用率', () => {
       [{ date: '2026-12-01', kind: 'morning' }],
     )
     expect(r).toEqual({ requested: 0, adopted: 0 })
+  })
+})
+
+describe('希望に対する結果', () => {
+  it('希望どおり／時間帯変更／見送り', () => {
+    expect(requestOutcome([{ type: 'morning' }], ['morning'])).toBe('match')
+    expect(requestOutcome([{ type: 'morning' }, { type: 'evening' }], ['both'])).toBe('match')
+    expect(requestOutcome([{ type: 'morning' }], ['base'])).toBe('match')
+    expect(requestOutcome([{ type: 'morning' }], ['evening'])).toBe('changed')
+    expect(requestOutcome([{ type: 'night' }], [])).toBe('skipped')
+    expect(requestOutcome([{ type: 'night' }], ['off'])).toBe('skipped')
+  })
+  it('×・有給', () => {
+    expect(requestOutcome([{ type: 'off' }], [])).toBeNull()
+    expect(requestOutcome([{ type: 'off' }], ['morning'])).toBe('on_off')
+    expect(requestOutcome([{ type: 'paid_leave' }], ['paid_leave'])).toBe('match')
+    expect(requestOutcome([{ type: 'paid_leave' }], [])).toBe('skipped')
+  })
+  it('希望なしは何も出さない', () => {
+    expect(requestOutcome([], ['morning'])).toBeNull()
   })
 })
