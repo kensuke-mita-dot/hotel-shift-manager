@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-server'
 import { getSessionUser } from '@/lib/session'
 import { todayJST, monthRange, weekday, WEEK_JA, cn } from '@/lib/utils'
 import { KIND_COLOR, hhmm, isWorkKind, kindLabel, KIND_BOTH, KIND_CUSTOM } from '@/lib/shift-kinds'
-import { adoptionStats, requestOutcome, requestText, type RequestOutcome } from '@/lib/requests'
+import { requestOutcome, requestText, type RequestOutcome } from '@/lib/requests'
 import { loadTeamSchedule, type TeamShift } from '@/lib/staff-schedule'
 import type { FacilitySlot, RequestType } from '@/types'
 
@@ -136,8 +136,6 @@ async function MyView({ userId, month, today, nextMonthHref }: {
   }
 
   const workDays = new Set(shifts.filter(s => isWorkKind(s.kind)).map(s => s.date)).size
-  const ad = adoptionStats(requests, shifts)
-  const rate = ad.requested > 0 ? Math.round((ad.adopted / ad.requested) * 100) : null
 
   // シフトか希望がある日を並べる（×の希望どおり休みの日は省く）
   const shiftsBy = new Map<string, typeof shifts>()
@@ -149,21 +147,7 @@ async function MyView({ userId, month, today, nextMonthHref }: {
 
   return (
     <>
-      <div className="grid grid-cols-2 bg-white rounded-card border border-hs-border divide-x divide-hs-border">
-        <div className="p-3 text-center">
-          <div className="text-xs text-hs-text-sub">出勤</div>
-          <div className="text-xl font-semibold text-hs-text tabular-nums">{workDays}<span className="text-sm font-normal ml-0.5">日</span></div>
-        </div>
-        <div className="p-3 text-center">
-          <div className="text-xs text-hs-text-sub">希望の採用</div>
-          <div className="text-xl font-semibold text-hs-text tabular-nums">
-            {rate === null ? <span className="text-sm font-normal text-hs-text-lighter">希望なし</span> : (
-              <>{ad.adopted}<span className="text-sm font-normal text-hs-text-sub"> / {ad.requested}日</span>
-                <span className="text-xs font-normal text-hs-text-sub ml-1">（{rate}%）</span></>
-            )}
-          </div>
-        </div>
-      </div>
+      <p className="text-sm text-hs-text-sub">出勤 {workDays}日</p>
 
       <ul className="bg-white rounded-card border border-hs-border divide-y divide-hs-border">
         {dates.map(d => {
@@ -180,10 +164,11 @@ async function MyView({ userId, month, today, nextMonthHref }: {
                   {WEEK_JA[wd]}{isToday && '・今日'}
                 </div>
               </div>
+              {/* 左：シフト */}
               <div className="min-w-0 flex-1 space-y-1.5">
                 {list.length === 0 ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-1 self-stretch rounded-full border-l-2 border-dashed border-hs-border" />
+                  <div className="flex items-center gap-3 h-full">
+                    <div className="w-1 self-stretch rounded-full bg-hs-gray-light" />
                     <div className="text-sm text-hs-text-lighter">勤務なし</div>
                   </div>
                 ) : list.map(s => (
@@ -198,15 +183,22 @@ async function MyView({ userId, month, today, nextMonthHref }: {
                     </div>
                   </div>
                 ))}
-                {reqs.length > 0 && (
-                  <div className="flex items-center gap-2 pl-4 text-xs">
-                    <span className="text-hs-text-lighter">希望：{requestText(reqs)}</span>
+              </div>
+              {/* 右：希望と結果 */}
+              <div className="w-24 flex-shrink-0 flex flex-col items-end justify-center gap-1 text-right">
+                {reqs.length > 0 ? (
+                  <>
+                    <span className="text-xs text-hs-text-sub leading-tight">
+                      <span className="text-hs-text-lighter">希望 </span>{requestText(reqs)}
+                    </span>
                     {outcome && (
-                      <span className={cn('px-1.5 py-px rounded border text-[11px] font-medium', OUTCOME[outcome].cls)}>
+                      <span className={cn('px-1.5 py-px rounded border text-[11px] font-medium whitespace-nowrap', OUTCOME[outcome].cls)}>
                         {OUTCOME[outcome].label}
                       </span>
                     )}
-                  </div>
+                  </>
+                ) : (
+                  <span className="text-xs text-hs-text-lighter">希望なし</span>
                 )}
               </div>
             </li>
