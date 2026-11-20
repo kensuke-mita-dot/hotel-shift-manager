@@ -100,3 +100,31 @@ export function adoptionStats(
   wanted.forEach(d => { if (worked.has(d)) adopted++ })
   return { requested: wanted.size, adopted }
 }
+
+/**
+ * 希望に対する結果（スタッフの確定シフト画面の表示用）。
+ * - match    ：希望どおり（基本勤務の施設は、勤務の希望があれば希望どおり）
+ * - changed  ：希望の日に入ったが時間帯が違う
+ * - skipped  ：希望を出したが入らなかった
+ * - on_off   ：×（入れない）や有給の希望の日に勤務が入った
+ * 希望がない日、×の希望どおり休みの日は null（何も出さない）
+ */
+export type RequestOutcome = 'match' | 'changed' | 'skipped' | 'on_off'
+
+export function requestOutcome(reqs: { type: RequestType }[], shiftKinds: string[]): RequestOutcome | null {
+  if (reqs.length === 0) return null
+  const work = shiftKinds.filter(isWorkKind)
+  const types = new Set(reqs.map(r => r.type))
+  if (types.has('off')) return work.length > 0 ? 'on_off' : null
+  if (types.has('paid_leave')) {
+    if (shiftKinds.includes('paid_leave')) return 'match'
+    return work.length > 0 ? 'on_off' : 'skipped'
+  }
+  if (work.length === 0) return 'skipped'
+  const matches = (kind: string) => {
+    if (kind === 'base') return true
+    if (kind === 'both') return types.has('both') || (types.has('morning') && types.has('evening'))
+    return types.has(kind as RequestType)
+  }
+  return work.some(matches) ? 'match' : 'changed'
+}
