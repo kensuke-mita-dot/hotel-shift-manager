@@ -12,8 +12,8 @@ import { monthRange, weekday, WEEK_JA, cn, mainFacility, addDays, parseFacilityP
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-interface RowStats { count: number; total: number; ad: { requested: number; adopted: number } }
-const EMPTY_STATS: RowStats = { count: 0, total: 0, ad: { requested: 0, adopted: 0 } }
+interface RowStats { count: number; total: number; off: number; paid: number; ad: { requested: number; adopted: number } }
+const EMPTY_STATS: RowStats = { count: 0, total: 0, off: 0, paid: 0, ad: { requested: 0, adopted: 0 } }
 
 function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number)
@@ -142,7 +142,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shifts, facility, board.slots])
 
-  // 右端の集計（人ごと）：日数（選んでいる施設）・全施設の合計・希望の採用
+  // 右端の集計（人ごと）：日数（選んでいる施設）・全施設の合計・休日（休み・有給。施設に関係なく人×日で数える）・希望の採用
   const statsBy = useMemo(() => {
     const shiftsBy = new Map<string, BoardShift[]>()
     for (const x of monthShifts) shiftsBy.set(x.staff_id, [...(shiftsBy.get(x.staff_id) ?? []), x])
@@ -154,11 +154,13 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
       map.set(staffId, {
         count: new Set(work.filter(x => inFacilitySelection(sel, x.facility_id)).map(x => x.date)).size,
         total: new Set(work.map(x => x.date)).size,
+        off: new Set(mine.filter(x => x.kind === KIND_OFF).map(x => x.date)).size,
+        paid: new Set(mine.filter(x => x.kind === KIND_PAID).map(x => x.date)).size,
         ad: adoptionStats(reqsBy.get(staffId) ?? [], mine),
       })
     })
     reqsBy.forEach((reqs, staffId) => {
-      if (!map.has(staffId)) map.set(staffId, { count: 0, total: 0, ad: adoptionStats(reqs, []) })
+      if (!map.has(staffId)) map.set(staffId, { count: 0, total: 0, off: 0, paid: 0, ad: adoptionStats(reqs, []) })
     })
     return map
     // sel は facility から決まる
@@ -334,12 +336,14 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
               })}
               <th className="sticky top-0 z-20 bg-hs-gray-lighter px-2 py-2 font-medium text-hs-text-sub border-b border-l border-hs-border">日数</th>
               <th className="sticky top-0 z-20 bg-hs-gray-lighter px-2 py-2 font-medium text-hs-text-sub border-b border-l border-hs-border"
+                title="「休」を入れた日数。（）内は有給の日数">休日</th>
+              <th className="sticky top-0 z-20 bg-hs-gray-lighter px-2 py-2 font-medium text-hs-text-sub border-b border-l border-hs-border"
                 title="勤務の希望（×・有給以外）を出した日のうち、どこかの施設で勤務が入った日の割合">採用</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((s, i) => {
-              const { count, total, ad } = statsBy.get(s.id) ?? EMPTY_STATS
+              const { count, total, off, paid, ad } = statsBy.get(s.id) ?? EMPTY_STATS
               const rate = ad.requested > 0 ? Math.round((ad.adopted / ad.requested) * 100) : null
               const group = mainFacility(s)
               const newGroup = i === 0 || mainFacility(rows[i - 1]) !== group
@@ -347,7 +351,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                 <Fragment key={s.id}>
                 {newGroup && (
                   <tr>
-                    <td colSpan={dates.length + 3} className="bg-hs-gray-light px-3 py-1 text-[11px] font-semibold text-hs-text-sub border-b border-hs-border">
+                    <td colSpan={dates.length + 4} className="bg-hs-gray-light px-3 py-1 text-[11px] font-semibold text-hs-text-sub border-b border-hs-border">
                       <span className="sticky left-3">{group ? `${group}　${facilityName.get(group) ?? ''}` : '所属未設定'}</span>
                     </td>
                   </tr>
@@ -418,6 +422,11 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                     {count}
                     {!isAll && total !== count && <span className="ml-0.5 text-[10px] text-hs-text-lighter">（計{total}）</span>}
                   </td>
+                  <td className="px-2 py-1.5 border-b border-l border-hs-border text-center tabular-nums text-hs-text whitespace-nowrap"
+                    title={`休み${off}日${paid ? `・有給${paid}日` : ''}`}>
+                    {off}
+                    {paid > 0 && <span className="ml-0.5 text-[10px] text-hs-text-lighter">（有{paid}）</span>}
+                  </td>
                   <td className={cn('px-2 py-1.5 border-b border-l border-hs-border text-center tabular-nums whitespace-nowrap',
                       rate === null ? 'text-hs-text-lighter' : rate < 50 ? 'text-hs-warn font-semibold' : 'text-hs-text')}
                     title={rate === null ? '勤務の希望がありません' : `希望${ad.requested}日のうち${ad.adopted}日採用（全施設）`}>
@@ -428,7 +437,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={dates.length + 3} className="px-4 py-8 text-center text-hs-text-lighter">
+              <tr><td colSpan={dates.length + 4} className="px-4 py-8 text-center text-hs-text-lighter">
                 対象のスタッフがいません。<Link href="/admin/staff" className="underline">スタッフ</Link>で所属施設を設定してください。
               </td></tr>
             )}
@@ -449,6 +458,7 @@ export function MonthlyClient({ board, facility }: { board: MonthBoard; facility
                         short ? 'bg-hs-danger-bg text-hs-danger font-semibold' : 'text-hs-text-sub')}>{n}</td>
                     )
                   })}
+                  <td className="border-t border-l border-hs-border" />
                   <td className="border-t border-l border-hs-border" />
                   <td className="border-t border-l border-hs-border" />
                 </tr>
