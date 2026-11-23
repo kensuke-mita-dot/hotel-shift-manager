@@ -3,9 +3,14 @@ import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { fetchCost } from '@/app/actions/cost'
 import { FACILITY_DEFAULT_WAGE, PAID_LEAVE_HOURS } from '@/lib/pay'
 import { yen, cn, nextMonthJST } from '@/lib/utils'
+import { CopyButton } from '@/components/admin/CopyButton'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const hours = (min: number) => `${(Math.round(min / 6) / 10).toLocaleString('ja-JP')}h`
+/** コピー用の時間（「728.5」のような数字だけ） */
+const hoursNum = (min: number) => String(Math.round(min / 6) / 10)
+/** タブ区切りの表（スプレッドシートにそのまま貼れる） */
+const tsv = (rows: (string | number)[][]) => rows.map(r => r.join('\t')).join('\n')
 
 function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number)
@@ -61,7 +66,10 @@ export default async function CostPage({
           {/* 合計 */}
           <div className="bg-white rounded-card border border-hs-border p-5">
             <p className="text-xs text-hs-text-sub">{y}年{m}月 全施設の合計</p>
-            <p className="text-3xl font-semibold text-hs-text mt-1 tabular-nums">{yen(data.total.total)}</p>
+            <p className="flex items-center gap-1 mt-1">
+              <span className="text-3xl font-semibold text-hs-text tabular-nums">{yen(data.total.total)}</span>
+              <CopyButton text={String(data.total.total)} label="合計金額をコピー" />
+            </p>
             <div className="flex gap-6 mt-3 text-sm text-hs-text-sub flex-wrap">
               <span>給与 <b className="font-medium text-hs-text tabular-nums">{yen(data.total.pay)}</b></span>
               <span>交通費 <b className="font-medium text-hs-text tabular-nums">{yen(data.total.transport)}</b></span>
@@ -72,22 +80,37 @@ export default async function CostPage({
 
           {/* 施設別 */}
           <section>
-            <h2 className="text-sm font-medium text-hs-text mb-2">施設別（押すとスタッフ別をその施設で絞り込み）</h2>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h2 className="text-sm font-medium text-hs-text">施設別</h2>
+              <CopyButton label="施設別の表をコピー（スプレッドシートに貼れます）" text={tsv([
+                ['施設', '合計', '給与', '交通費', '人数', '実働(h)'],
+                ...data.facilities.map(f => { const t = data.facilityTotals[f.id]; return [f.id, t.total, t.pay, t.transport, t.staff, hoursNum(t.minutes)] }),
+                ['全施設', data.total.total, data.total.pay, data.total.transport, '', hoursNum(data.total.minutes)],
+              ])}>施設別をコピー</CopyButton>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {data.facilities.map(f => {
                 const t = data.facilityTotals[f.id]
                 const active = facility === f.id
                 return (
-                  <Link key={f.id} href={`/admin/cost?month=${month}${active ? '' : `&facility=${f.id}`}`}
-                    className={cn('bg-white rounded-card border p-4 block hover:border-hs-blue-border',
+                  // 金額を選んでコピーできるよう、カード全体はリンクにしない（絞り込みは下のボタン）
+                  <div key={f.id}
+                    className={cn('bg-white rounded-card border p-4',
                       active ? 'border-hs-blue ring-1 ring-hs-blue' : 'border-hs-border')}>
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-sm font-semibold text-hs-text">{f.id}</span>
                       <span className="text-xs text-hs-text-lighter">{t.staff}名 · {hours(t.minutes)}</span>
                     </div>
-                    <p className="text-xl font-semibold text-hs-text mt-2 tabular-nums">{yen(t.total)}</p>
+                    <p className="flex items-center gap-1 mt-2">
+                      <span className="text-xl font-semibold text-hs-text tabular-nums">{yen(t.total)}</span>
+                      <CopyButton text={String(t.total)} label={`${f.id}の合計をコピー`} />
+                    </p>
                     <p className="text-xs text-hs-text-sub mt-1 tabular-nums">給与 {yen(t.pay)} · 交通費 {yen(t.transport)}</p>
-                  </Link>
+                    <Link href={`/admin/cost?month=${month}${active ? '' : `&facility=${f.id}`}`}
+                      className="mt-2 inline-block text-xs text-hs-blue hover:underline">
+                      {active ? '絞り込みを解除' : 'スタッフ別を絞り込む'}
+                    </Link>
+                  </div>
                 )
               })}
             </div>
@@ -95,7 +118,14 @@ export default async function CostPage({
 
           {/* スタッフ別 */}
           <section>
-            <h2 className="text-sm font-medium text-hs-text mb-2">スタッフ別{facility ? `（${facility}で勤務した人。金額は全施設の合計）` : ''}</h2>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h2 className="text-sm font-medium text-hs-text">スタッフ別{facility ? `（${facility}で勤務した人。金額は全施設の合計）` : ''}</h2>
+              <CopyButton label="スタッフ別の表をコピー（スプレッドシートに貼れます）" text={tsv([
+                ['スタッフ', '出勤(日)', '有給(日)', '実働(h)', 'うち深夜(h)', '時給', '給与', '交通費', '合計'],
+                ...rows.map(r => [r.fullName, r.days, r.paidLeaveDays, hoursNum(r.minutes), hoursNum(r.lateMinutes),
+                  r.usesDefaultWage ? '施設の初期値' : r.hourlyWage ?? 0, r.pay, r.transport, r.total]),
+              ])}>表をコピー</CopyButton>
+            </div>
             <div className="bg-white rounded-card border border-hs-border overflow-x-auto">
               <table className="w-full text-sm min-w-[760px]">
                 <thead>
